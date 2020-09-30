@@ -30,3 +30,7 @@
 *.exe
 *.out
 *.app
+
+# Ignoring Clion folders
+auto_generated/
+cmake-build-debug/

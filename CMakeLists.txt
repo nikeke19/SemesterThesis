@@ -87,8 +87,9 @@ add_library(${PROJECT_NAME}
   src/kinematics/ur3/UR3Kinematics.cpp
   src/EsdfCachingServer.cpp
   src/AdmittanceReferenceModule.cpp
+  #Added by Nick
   ompl_planner/VoxbloxStateValidityChecker.cpp
-  #ompl_planner/EndEffectorGoal.cpp
+  ompl_planner/EndEffectorGoal.cpp
 )
 add_dependencies(${PROJECT_NAME}
         ${${PROJECT_NAME}_EXPORTED_TARGETS}

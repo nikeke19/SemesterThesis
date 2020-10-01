@@ -2,8 +2,13 @@
 // Created by johannes on 05.05.20.
 //
 #pragma once
-#include "kindr/poses/HomogeneousTransformation.hpp"
-#include "ompl/base/goals/GoalRegion.h"
+#include <kindr/poses/HomogeneousTransformation.hpp>
+#include <ompl/base/goals/GoalRegion.h>
+
+#include "EndEffectorGoal.h"
+#include "OmplStateConversions.h"
+#include "perceptive_mpc/kinematics/KinematicsInterface.hpp"
+#include "perceptive_mpc/kinematics/mabi/MabiKinematics.hpp"
 
 namespace perceptive_mpc {
 using namespace ompl::base;

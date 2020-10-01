@@ -42,15 +42,14 @@ ompl::base::GoalPtr OmplPlanner::convertPoseToOmplGoal(const kindr::HomTransform
     auto space(std::make_shared<MabiStateSpace>());
     og::SimpleSetup ss(space);
 
-//    EndEffectorGoal::Settings eeGoalSettings;
-//    eeGoalSettings.goal = goal_pose;
-//    eeGoalSettings.positionTolerance = settings_.positionTolerance;
-//    eeGoalSettings.angularTolerance = settings_.orientationTolerance;
-//    eeGoalSettings.transformWrist2_X_Endeffector = settings_.transformWrist2_X_Endeffector;
-//    eeGoalSettings.transformBase_X_ArmMount = settings_.transformBase_X_ArmMount;
-//    auto endEffectorGoal = std::make_shared<EndEffectorGoal>(ss.getSpaceInformation(), eeGoalSettings);
-//    return endEffectorGoal;
-    return nullptr;
+    EndEffectorGoal::Settings eeGoalSettings;
+    eeGoalSettings.goal = goal_pose;
+    eeGoalSettings.positionTolerance = settings_.positionTolerance;
+    eeGoalSettings.angularTolerance = settings_.orientationTolerance;
+    eeGoalSettings.transformWrist2_X_Endeffector = settings_.transformWrist2_X_Endeffector;
+    eeGoalSettings.transformBase_X_ArmMount = settings_.transformBase_X_ArmMount;
+    auto endEffectorGoal = std::make_shared<EndEffectorGoal>(ss.getSpaceInformation(), eeGoalSettings);
+    return endEffectorGoal;
 }
 
 void OmplPlanner::planTrajectory(const Eigen::Matrix<float, Definitions::STATE_DIM_, 1>& start_position, const kindr::HomTransformQuatD& goal_pose) {

@@ -79,8 +79,8 @@ void OmplPlanner::planTrajectory(const Eigen::Matrix<float, Definitions::STATE_D
 
     //Setting up the collision detection
     auto si = ss.getSpaceInformation();
-//    auto voxbloxStateValidityChecker = std::make_shared<VoxbloxStateValidityChecker>(si.get(), settings_.voxbloxCostConfig);
-//    ss.setStateValidityChecker(voxbloxStateValidityChecker);
+    auto voxbloxStateValidityChecker = std::make_shared<VoxbloxStateValidityChecker>(si.get(), settings_.voxbloxCostConfig);
+    ss.setStateValidityChecker(voxbloxStateValidityChecker);
 
     //Defining the start new //@todo See if this works
     ob::ScopedState<MabiStateSpace> start(space);
@@ -92,9 +92,9 @@ void OmplPlanner::planTrajectory(const Eigen::Matrix<float, Definitions::STATE_D
     ss.setStartState(start);
 
     //Defining the start //@todo otherwhise choose this
-    ob::ScopedState<MabiStateSpace> start2(space);
+//    ob::ScopedState<MabiStateSpace> start2(space);
 //    mpcToOmplState(start_position, start2.get());
-    ss.setStartState(start);
+//    ss.setStartState(start);
 
     //Setting the goal
     auto goal = convertPoseToOmplGoal(goal_pose);
@@ -114,6 +114,7 @@ void OmplPlanner::planTrajectory(const Eigen::Matrix<float, Definitions::STATE_D
               << std::endl;
 
     ob::PlannerStatus solved = ss.solve(settings_.maxPlanningTime);
+    ROS_ERROR("Solved");
     // ob::PlannerStatus solved = ss.solve(exactSolnPlannerTerminationCondition(ss.getProblemDefinition()));
 
 //    if (solved) {

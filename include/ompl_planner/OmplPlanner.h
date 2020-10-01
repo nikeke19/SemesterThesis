@@ -5,22 +5,26 @@
 #ifndef PERCEPTIVE_MPC_OMPLPLANNER_H
 #define PERCEPTIVE_MPC_OMPLPLANNER_H
 
+// ROS stuff
 #include <ros/ros.h>
 #include <sensor_msgs/JointState.h>
 #include <geometry_msgs/PoseStamped.h> // For input from interactive
-
 #include <Eigen/Dense>
 #include "kindr/poses/HomogeneousTransformation.hpp"
 
+// Custom Classes
+#include "EndEffectorGoal.h"
+#include "StateSpace.h"
+#include "perceptive_mpc/Definitions.h"
+#include "VoxbloxStateValidityChecker.h"
+
+//OMPL Setup
 #include <ompl/base/goals/GoalRegion.h>
 #include <ompl/base/Goal.h>
 #include <ompl/geometric/SimpleSetup.h>
 #include <ompl/geometric/PathGeometric.h>
 
-#include "ompl_planner/EndEffectorGoal.h"
-#include "StateSpace.h"
-#include "perceptive_mpc/Definitions.h"
-
+// OMPL Planners
 #include <ompl/geometric/planners/fmt/BFMT.h>
 #include <ompl/geometric/planners/rrt/RRTConnect.h>
 #include <ompl/geometric/planners/rrt/RRTXstatic.h>
@@ -49,7 +53,7 @@ struct Settings {
     double positionTolerance = 0.1;
     double orientationTolerance = 0.1;
 
-//    std::shared_ptr<VoxbloxCostConfig> voxbloxCostConfig = nullptr; //todo make this active?
+    std::shared_ptr<VoxbloxCostConfig> voxbloxCostConfig = nullptr;
 };
 
 class OmplPlanner {

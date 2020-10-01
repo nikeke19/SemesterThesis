@@ -2,7 +2,6 @@
 // Created by johannes on 05.05.20.
 //
 #include "ompl_planner/VoxbloxStateValidityChecker.h"
-#include "ompl_planner/OmplStateConversions.h"
 
 
 //#include <ocs2_mobile_manipulator_interface/costs/VoxbloxCost.h>

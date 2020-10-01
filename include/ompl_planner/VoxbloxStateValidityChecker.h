@@ -7,8 +7,7 @@
 #include "perceptive_mpc/costs/VoxbloxCost.h"
 #include "ompl_planner/StateSpace.h"
 #include "perceptive_mpc/Definitions.h"
-#include "ompl_planner/StateSpace.h"
-#include "ompl_planner/OmplStateConversions.h" //@todo See if needed
+#include "OmplStateConversions.h" //@todo See if needed
 
 #include <ocs2_core/dynamics/SystemDynamicsBase.h>
 #include <ompl/base/StateValidityChecker.h>

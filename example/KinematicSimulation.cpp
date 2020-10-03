@@ -44,7 +44,7 @@ bool KinematicSimulation::run() {
   parseParameters();
   loadTransforms();
 
-  //ros::Duration(20).sleep(); @ Nick for debug
+  ros::Duration(15).sleep(); //@ Nick for debug
 
   kinematicInterfaceConfig_.baseMass = 70;
   kinematicInterfaceConfig_.baseCOM = Eigen::Vector3d::Zero();
@@ -540,11 +540,14 @@ std::shared_ptr<VoxbloxCostConfig> KinematicSimulation::configureCollisionAvoida
       esdfCachingServer_.reset(new voxblox::EsdfCachingServer(ros::NodeHandle(), ros::NodeHandle("~")));
       voxbloxCostConfig->interpolator = esdfCachingServer_->getInterpolator();
 
-      pointsOnRobot_->initialize("points_on_robot");
+      pointsOnRobot_->initialize("points_on_robot"); //Fills
     } else {
       // if there are no points defined for collision checking, set this pointer to null to disable the visualization
       pointsOnRobot_ = nullptr;
     }
   }
+
+  Eigen::VectorXd test_vec;
+  auto test = voxbloxCostConfig->pointsOnRobot->getPoints(test_vec);
   return voxbloxCostConfig;
 }

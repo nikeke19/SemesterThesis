@@ -17,6 +17,7 @@
 #include "EndEffectorGoal.h"
 #include "StateSpace.h"
 #include "perceptive_mpc/Definitions.h"
+#include "perceptive_mpc/costs/PointsOnRobot.h"  //See if it helps
 #include "VoxbloxStateValidityChecker.h"
 #include "ocs2_core/Dimensions.h"
 #include "perceptive_mpc/EsdfCachingServer.hpp"
@@ -32,6 +33,9 @@
 #include <ompl/geometric/planners/rrt/RRTConnect.h>
 #include <ompl/geometric/planners/rrt/RRTXstatic.h>
 #include <ompl/geometric/planners/rrt/RRT.h>
+
+// test if it helps:
+#include <ocs2_core/automatic_differentiation/CppAdInterface.h>
 
 const float PI = 3.14159265359;
 

@@ -44,6 +44,8 @@ bool KinematicSimulation::run() {
   parseParameters();
   loadTransforms();
 
+  //ros::Duration(20).sleep(); @ Nick for debug
+
   kinematicInterfaceConfig_.baseMass = 70;
   kinematicInterfaceConfig_.baseCOM = Eigen::Vector3d::Zero();
 

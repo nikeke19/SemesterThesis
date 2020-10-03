@@ -12,7 +12,9 @@ using namespace perceptive_mpc;
 using namespace ompl::base;
 
 VoxbloxStateValidityChecker::VoxbloxStateValidityChecker(SpaceInformation* si, std::shared_ptr<VoxbloxCostConfig> voxbloxCostConfig)
-    : ompl::base::StateValidityChecker(si), voxbloxCost_(std::make_unique<VoxbloxCost>(*voxbloxCostConfig)) {}
+    : ompl::base::StateValidityChecker(si), voxbloxCost_(std::make_unique<VoxbloxCost>(*voxbloxCostConfig)) {
+
+}
 
 VoxbloxStateValidityChecker::~VoxbloxStateValidityChecker() = default;
 

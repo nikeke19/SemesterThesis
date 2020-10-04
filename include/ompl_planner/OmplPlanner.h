@@ -33,6 +33,8 @@
 #include <ompl/geometric/planners/rrt/RRTConnect.h>
 #include <ompl/geometric/planners/rrt/RRTXstatic.h>
 #include <ompl/geometric/planners/rrt/RRT.h>
+#include <ompl/geometric/planners/rrt/RRTstar.h>
+#include <ompl/geometric/planners/informedtrees/ABITstar.h>
 
 // test if it helps:
 #include <ocs2_core/automatic_differentiation/CppAdInterface.h>
@@ -93,16 +95,26 @@ public:
     };
 private:
     ros::NodeHandle nh_;
-    ros::Subscriber sub_desired_end_effector_pose_subscriber_;
-    ros::Publisher pub_arm_state_;
+    ros::Subscriber subDesiredEndEffectorPoseSubscriber_;
+    ros::Publisher pubArmState_;
+    tf::TransformBroadcaster tfOdomBroadcaster_;
+    geometry_msgs::TransformStamped odomTrans_;
+    sensor_msgs::JointState jointState_;
+    ros::Rate r_;
 
     Settings settings_;
-    CurrentState current_state_;
+    CurrentState currentState_;
+    PlannerOutput solutionTrajectory_;
+    std::vector<CurrentState> test;
 
     void initializeState();
     void cbDesiredEndEffectorPose(const geometry_msgs::PoseStampedConstPtr& msgPtr);
     void publishArmState();
+    void publishBaseTransform();
+    void publishSolutionTrajectory(const std::vector<CurrentState>& solutionTrajectory);
     std::shared_ptr<VoxbloxCostConfig> setUpVoxbloxCostConfig();
+    void testLoop();
+
 
 };
 

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <launch>
-   <!-- run rviz-->
+    <!-- run rviz-->
     <arg name="rviz"                default="true" />
     <!--     Name of the task file which defines the mpc problem settings-->
     <arg name="mpc_task_file"       default="task.info"/>
@@ -29,18 +29,18 @@
         <rosparam file="$(find perceptive_mpc)/config/voxblox.yaml"/>
     </node>
 
-
-    <node pkg="perceptive_mpc" name="kinematic_simulation" type="perceptive_mpc_kinematic_simulation"> <!-- launch-prefix="gdb -ex run &#45;&#45;args"-->
-      <param name="mpc_task_file"           value="$(arg mpc_task_file)"/>
-      <rosparam file="$(find perceptive_mpc)/config/kinematic_simulation_parameters.yaml"/> <!-- Removed output="screen" -->
-      <rosparam file="$(find perceptive_mpc)/config/voxblox.yaml"/>
-      <remap from="/kinematic_simulation/esdf_map_in" to="esdf_map" />
+   <!--
+    <node pkg="perceptive_mpc" name="kinematic_simulation" type="perceptive_mpc_kinematic_simulation">
+        <param name="mpc_task_file"           value="$(arg mpc_task_file)"/>
+        <rosparam file="$(find perceptive_mpc)/config/kinematic_simulation_parameters.yaml"/>
+        <rosparam file="$(find perceptive_mpc)/config/voxblox.yaml"/>
+        <remap from="/kinematic_simulation/esdf_map_in" to="esdf_map" />
     </node>
-
+    -->
     <node pkg="perceptive_mpc" name="ompl_planner" type="perceptive_mpc_ompl_planner" output="screen"> <!-- launch-prefix="gdb -ex run &#45;&#45;args"-->
-      <rosparam file="$(find perceptive_mpc)/config/voxblox.yaml"/>
-      <rosparam file="$(find perceptive_mpc)/config/kinematic_simulation_parameters.yaml"/>
-      <remap from="/kinematic_simulation/esdf_map_in" to="esdf_map" />
+        <rosparam file="$(find perceptive_mpc)/config/voxblox.yaml"/>
+        <rosparam file="$(find perceptive_mpc)/config/kinematic_simulation_parameters.yaml"/>
+        <remap from="/kinematic_simulation/esdf_map_in" to="esdf_map" />
     </node>
 
     <node name="interactive_pose_node" pkg="perceptive_mpc" type="interactive_marker.py" output="screen"/>

@@ -233,7 +233,7 @@ std::shared_ptr<VoxbloxCostConfig> OmplPlanner::setUpVoxbloxCostConfig() {
             esdfCachingServer_.reset(new voxblox::EsdfCachingServer(ros::NodeHandle(), ros::NodeHandle("~")));
             voxbloxCostConfig->interpolator = esdfCachingServer_->getInterpolator();
 
-            pointsOnRobot_->initialize("points_on_robot"); //todo somehow this doesn t work
+            pointsOnRobot_->initialize("points_on_robot","/tmp/ocs2",false); //todo somehow this doesn t work
         } else {
             // if there are no points defined for collision checking, set this pointer to null to disable the visualization
             pointsOnRobot_ = nullptr;

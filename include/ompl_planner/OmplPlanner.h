@@ -61,8 +61,8 @@ struct Settings {
     Eigen::Matrix4d transformWrist2_X_Endeffector = Eigen::Matrix4d::Identity();
 
     double maxPlanningTime = 20;
-    double positionTolerance = 0.1;
-    double orientationTolerance = 0.1;
+    double positionTolerance = 0.01; //todo was 0.1
+    double orientationTolerance = 0.01;
 
     std::shared_ptr<VoxbloxCostConfig> voxbloxCostConfig = nullptr;
 };
@@ -80,7 +80,7 @@ public:
     ~OmplPlanner()= default;
 
     ompl::base::GoalPtr convertPoseToOmplGoal(const kindr::HomTransformQuatD& goal_pose);
-    void planTrajectory(const Eigen::Matrix<float, Definitions::STATE_DIM_, 1>& start_position, const kindr::HomTransformQuatD& goal_pose);
+    void planTrajectory(const kindr::HomTransformQuatD& goal_pose);
 
     struct CurrentState {
         Eigen::Vector2d position2DBase;

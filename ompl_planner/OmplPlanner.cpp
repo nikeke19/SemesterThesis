@@ -54,8 +54,6 @@ void OmplPlanner::initializeState() {
     tfOdomBroadcaster_.sendTransform(odomTrans_);
 
     testLoop();
-
-
 }
 void OmplPlanner::testLoop() {
     int i = 0;
@@ -68,19 +66,15 @@ void OmplPlanner::testLoop() {
         r_.sleep();
         i++;
     }
-
 }
 
 void OmplPlanner::cbDesiredEndEffectorPose(const geometry_msgs::PoseStampedConstPtr &msgPtr) {
     kindr::HomTransformQuatD goal_pose;  //todo set goal pose
+//    kindr_ros::convertFromRosGeometryMsg(msgPtr->pose, goal_pose);
     kindr_ros::convertFromRosGeometryMsg(msgPtr->pose, goal_pose);
 
-    Eigen::Matrix<float, 13, 1> start_position; //todo seems doing nothing now
-
     ROS_ERROR("OMPL: Received Desired End Effector CB");
-
-//    pubArmState_.publish(msg);
-    planTrajectory(start_position, goal_pose);  //todo start position could be removed
+    planTrajectory(goal_pose);  //todo start position could be removed
 }
 
 ompl::base::GoalPtr OmplPlanner::convertPoseToOmplGoal(const kindr::HomTransformQuatD& goal_pose) {
@@ -91,26 +85,20 @@ ompl::base::GoalPtr OmplPlanner::convertPoseToOmplGoal(const kindr::HomTransform
     eeGoalSettings.goal = goal_pose;
     eeGoalSettings.positionTolerance = settings_.positionTolerance;
     eeGoalSettings.angularTolerance = settings_.orientationTolerance;
-    eeGoalSettings.transformWrist2_X_Endeffector = settings_.transformWrist2_X_Endeffector; //todo at the moment identity but correct?
-    eeGoalSettings.transformBase_X_ArmMount = settings_.transformBase_X_ArmMount; //todo at the moment identity but correct?
+    eeGoalSettings.transformWrist2_X_Endeffector = settings_.transformWrist2_X_Endeffector;
+    eeGoalSettings.transformBase_X_ArmMount = settings_.transformBase_X_ArmMount;
+
+//    KinematicInterfaceConfig kinematicInterfaceConfig;
+//    kinematicInterfaceConfig.baseCOM = Eigen::Vector3d::Zero();
+//    kinematicInterfaceConfig.baseMass = 70;
+//    MabiKinematics<double> kinematicsInterface(kinematicInterfaceConfig);
+//    kinematicsInterface.
+
     auto endEffectorGoal = std::make_shared<EndEffectorGoal>(ss.getSpaceInformation(), eeGoalSettings);
     return endEffectorGoal;
 }
 
-//ompl::base::GoalPtr OmplPlanner::convertPoseToOmplGoal2(const kindr::HomTransformQuatD& goal_pose)(
-//        const WholeBodySamplingPlanner::state_vector_t& initialState, const WholeBodySamplingPlanner::state_vector_t& goalState) {
-//    auto space(std::make_shared<MabiStateSpace>());
-//    og::SimpleSetup ss(space);
-//
-//    ob::ScopedState<MabiStateSpace> goalStateOmpl(std::make_shared<MabiStateSpace>());
-//    mpcToOmplState(goalState, goalStateOmpl.get());
-//    auto plannerGoalState = std::make_shared<GoalState>(ss.getSpaceInformation());
-//    plannerGoalState->setState(goalStateOmpl);
-//
-//    return plan(initialState, plannerGoalState);
-//}
-
-void OmplPlanner::planTrajectory(const Eigen::Matrix<float, Definitions::STATE_DIM_, 1>& start_position, const kindr::HomTransformQuatD& goal_pose) {
+void OmplPlanner::planTrajectory(const kindr::HomTransformQuatD& goal_pose) {
     ROS_ERROR("OMPL: Create State Space ");
 
     // define state space
@@ -159,25 +147,16 @@ void OmplPlanner::planTrajectory(const Eigen::Matrix<float, Definitions::STATE_D
         start->armState()->values[i] = currentState_.jointAngles[i];
     ss.setStartState(start);
 
-    //Defining the start //@todo otherwhise choose this
-//    ob::ScopedState<MabiStateSpace> start2(space);
-//    mpcToOmplState(start_position, start2.get());
-//    ss.setStartState(start);
-
-
-
     //Setting the goal
     auto goal = convertPoseToOmplGoal(goal_pose);
     ss.setGoal(goal);
-
-
 
     // Defining the planner
     // auto planner = std::make_shared<og::RRTXstatic>(si);
     // auto planner = std::make_shared<og::RRTConnect>(si);
 //    auto planner = std::make_shared<og::BFMT>(si);
-//    auto planner = std::make_shared<og::RRT>(si);
-    auto planner = std::make_shared<og::RRTstar>(si);
+    auto planner = std::make_shared<og::RRT>(si);
+//    auto planner = std::make_shared<og::RRTstar>(si);
     planner->setRange(0.1);
     planner->setGoalBias(0.5);
 //    planner->setExtendedFMT(true);
@@ -195,44 +174,11 @@ void OmplPlanner::planTrajectory(const Eigen::Matrix<float, Definitions::STATE_D
 
     if (solved) {
         std::cout << "Solved:" << solved.asString() << std::endl;
-//        std::cout << "state count:" << ss.getSolutionPath().getStateCount() << std::endl;
-//        std::cout << "computation time:" << ss.getLastPlanComputationTime() << std::endl;
-//        std::cout << "length:" << ss.getSolutionPath().length() << std::endl;
-        //ss.getSolutionPath().printAsMatrix(std::cout);
-
-        // ss.print();
-        //    std::cout << "goal distance start: " << endEffectorGoal->distanceGoal(ss.getSolutionPath().getStates().front()) << std::endl;
-        //    std::cout << "goal distance end: " << endEffectorGoal->distanceGoal(ss.getSolutionPath().getStates().back()) << std::endl;
-        //std::cout << "clearance: " << ss.getSolutionPath().clearance() << std::endl;
-
-        //std::cout << "goal reached: " << endEffectorGoal->isSatisfied(ss.getSolutionPath().getStates().back()) << std::endl;
-//            ss.getSolutionPath().asGeometric().printAsMatrix(std::cout);
-         //ss.getSolutionPath().print(std::cout);
-//
-//        auto output = std::make_unique<PlannerOutput>();
-//
-//        output->states.reserve(ss.getSolutionPath().getStateCount());
-//        for (const auto& state : ss.getSolutionPath().getStates()) {
-//            Eigen::VectorXd stateDyn;
-//            omplToMpcState(state->as<MabiState>(), stateDyn);
-//
-//            output->states.push_back(stateDyn.head<STATE_DIM_>());
-//        }
-//        output->times = std::vector<double>(ss.getSolutionPath().getStateCount() - 1, 0.01);
-//
-//        solutionTrajectory_ = *output;
-
-//        return output;
-
-        //Transforming solution
-        //CurrentState solutionTrajectory[ss.getSolutionPath().getStateCount()];
 
         //Adding more points to solution trajectory
         int n_points = int(ss.getSolutionPath().length() *10);
         std::cout << "number of points to add"<< n_points <<std::endl;
-        std::cout << "number of states before" << ss.getSolutionPath().getStateCount() << std::endl;
         ss.getSolutionPath().interpolate(n_points);
-        std::cout << "number of states after interpolation" << ss.getSolutionPath().getStateCount() << std::endl;
 
         //Object to store solution in
         std::vector<CurrentState> solutionTrajectory;
@@ -254,11 +200,7 @@ void OmplPlanner::planTrajectory(const Eigen::Matrix<float, Definitions::STATE_D
         }
 
         publishSolutionTrajectory(solutionTrajectory);
-
         ROS_WARN("Achieved Output");
-
-
-
 
     }
     else {
@@ -348,8 +290,9 @@ std::shared_ptr<VoxbloxCostConfig> OmplPlanner::setUpVoxbloxCostConfig() {
             esdfCachingServer_.reset(new voxblox::EsdfCachingServer(ros::NodeHandle(), ros::NodeHandle("~")));
             voxbloxCostConfig->interpolator = esdfCachingServer_->getInterpolator();
 
-            //pointsOnRobot_->initialize("points_on_robot");
-            pointsOnRobot_->initialize("points_on_robot","/tmp/ocs2",false); //todo somehow this doesn t work
+            pointsOnRobot_->initialize("points_on_robot");
+//            pointsOnRobot_->initialize("points_on_robot","/tmp/ocs2",true);
+//            pointsOnRobot_->initialize("points_on_robot","/tmp/ocs2",false); //todo somehow this only works
         } else {
             // if there are no points defined for collision checking, set this pointer to null to disable the visualization
             pointsOnRobot_ = nullptr;

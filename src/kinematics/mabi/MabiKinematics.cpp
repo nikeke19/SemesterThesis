@@ -63,7 +63,7 @@ Eigen::Matrix<SCALAR_T, 3, -1> MabiKinematics<SCALAR_T>::computeArmState2Multipl
   }
   Eigen::Matrix<SCALAR_T, 3, -1> result(3, dim);
   int resultIndex = 0;
-  int linkIndex;
+  int linkIndex = 0; //todo there was nothing, added =0
 
   Eigen::Matrix<SCALAR_T, 4, 4> transformWorld_X_Endeffector = transformWorld_X_Base;
 

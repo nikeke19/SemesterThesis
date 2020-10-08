@@ -46,7 +46,7 @@ void VoxbloxCost::setCurrentStateAndControl(const VoxbloxCost::scalar_t& t, cons
       Eigen::Vector3f gradientVoxblox;
       Eigen::Ref<Eigen::Matrix<scalar_t, 3, 1>> position = positionsPointsOnRobot.segment<3>(i * 3);
 
-      std::cout << position << std::endl <<std::endl; //todo only for debug
+      //std::cout << position << std::endl <<std::endl; //todo only for debug
 
       if (interpolator_->getInterpolatedDistanceGradient(position.cast<float>(), &distance, &gradientVoxblox)) {
         distances_[i] = distance - radii(i);

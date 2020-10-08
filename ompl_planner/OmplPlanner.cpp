@@ -16,10 +16,14 @@ OmplPlanner::OmplPlanner(const ros::NodeHandle& nodeHandle) : nh_(nodeHandle), r
     pubArmState_ = nh_.advertise<sensor_msgs::JointState>("/joint_states", 10);
     while(ros::ok() && pubArmState_.getNumSubscribers() == 0)
         ros::Rate(100).sleep();
+    serviceLoadMap_ = nh_.serviceClient<voxblox_msgs::FilePath>("/voxblox_node/load_map");
 
     //ros::Duration(15).sleep();
     initializeState();
     initializeKinematicInterfaceConfig();
+    loadMap();
+    ros::Duration(10).sleep();
+    setUpVoxbloxCostConfig();
 }
 //@todo for debug
 bool isStateValid(const ob::State *state) {
@@ -34,7 +38,7 @@ void OmplPlanner::initializeState() {
     //Setting up own State
     currentState_.position2DBase << 0,0;
     currentState_.yaw_base = 0;
-    currentState_.jointAngles << PI, -PI/2, -PI/4, 0, -PI/2, PI/4;
+    currentState_.jointAngles << 0, -PI/2, -PI/4, 0, -PI/2, PI/4;
 
     //Setting up Transform for the base
     odomTrans_.header.frame_id = "odom";
@@ -93,7 +97,7 @@ void OmplPlanner::initializeKinematicInterfaceConfig() {
         kinematicInterfaceConfig_.transformBase_X_ArmMount(0, 3) = transformStamped.transform.translation.x;
         kinematicInterfaceConfig_.transformBase_X_ArmMount(1, 3) = transformStamped.transform.translation.y;
         kinematicInterfaceConfig_.transformBase_X_ArmMount(2, 3) = transformStamped.transform.translation.z;
-        ROS_INFO_STREAM("baseToArmMount_: " << std::endl << kinematicInterfaceConfig_.transformBase_X_ArmMount);
+        //ROS_INFO_STREAM("baseToArmMount_: " << std::endl << kinematicInterfaceConfig_.transformBase_X_ArmMount);
     }
 
     {
@@ -113,12 +117,22 @@ void OmplPlanner::initializeKinematicInterfaceConfig() {
         kinematicInterfaceConfig_.transformToolMount_X_Endeffector(0, 3) = transformStamped.transform.translation.x;
         kinematicInterfaceConfig_.transformToolMount_X_Endeffector(1, 3) = transformStamped.transform.translation.y;
         kinematicInterfaceConfig_.transformToolMount_X_Endeffector(2, 3) = transformStamped.transform.translation.z;
-        ROS_INFO_STREAM("wrist2ToEETransform_: " << std::endl << kinematicInterfaceConfig_.transformToolMount_X_Endeffector);
+        //ROS_INFO_STREAM("wrist2ToEETransform_: " << std::endl << kinematicInterfaceConfig_.transformToolMount_X_Endeffector);
     }
 
     //Writing everything to settings:
     settings_.transformBase_X_ArmMount = kinematicInterfaceConfig_.transformBase_X_ArmMount;
     settings_.transformWrist2_X_Endeffector = kinematicInterfaceConfig_.transformToolMount_X_Endeffector;
+}
+
+void OmplPlanner::loadMap() {
+    voxblox_msgs::FilePath srv;
+    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/example/example_map.esdf";
+    serviceLoadMap_.waitForExistence();
+    if (serviceLoadMap_.call(srv))
+        ROS_INFO("Service load map called succesfully");
+    else
+        ROS_ERROR("Could not load map, try manually");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -143,12 +157,6 @@ ompl::base::GoalPtr OmplPlanner::convertPoseToOmplGoal(const kindr::HomTransform
     eeGoalSettings.angularTolerance = settings_.orientationTolerance;
     eeGoalSettings.transformWrist2_X_Endeffector = settings_.transformWrist2_X_Endeffector;
     eeGoalSettings.transformBase_X_ArmMount = settings_.transformBase_X_ArmMount;
-
-//    KinematicInterfaceConfig kinematicInterfaceConfig;
-//    kinematicInterfaceConfig.baseCOM = Eigen::Vector3d::Zero();
-//    kinematicInterfaceConfig.baseMass = 70;
-//    MabiKinematics<double> kinematicsInterface(kinematicInterfaceConfig);
-//    kinematicsInterface.
 
     auto endEffectorGoal = std::make_shared<EndEffectorGoal>(ss.getSpaceInformation(), eeGoalSettings);
     return endEffectorGoal;
@@ -182,21 +190,19 @@ void OmplPlanner::planTrajectory(const kindr::HomTransformQuatD& goal_pose) {
             settings_.maxArmPositionLimits;
     space->armStateSpace()->setBounds(armPositionBounds);
 
-
     // define a simple setup class
     og::SimpleSetup ss(space);
 
-
     //Setting up the collision detection
-//    auto si = ss.getSpaceInformation();
-//    setUpVoxbloxCostConfig();
-//    auto voxbloxStateValidityChecker = std::make_shared<VoxbloxStateValidityChecker>(si.get(), settings_.voxbloxCostConfig);
-//    ss.setStateValidityChecker(voxbloxStateValidityChecker);
+    auto si = ss.getSpaceInformation();
+    //setUpVoxbloxCostConfig();
+    esdfCachingServer_->updateInterpolator();
+    auto voxbloxStateValidityChecker = std::make_shared<VoxbloxStateValidityChecker>(si.get(), settings_.voxbloxCostConfig);
+    ss.setStateValidityChecker(voxbloxStateValidityChecker);
 
     //todo alternative to only run
-    auto si = ss.getSpaceInformation();
-    ss.setStateValidityChecker([](const ob::State *state) { return isStateValid(state); });
-
+//    auto si = ss.getSpaceInformation();
+//    ss.setStateValidityChecker([](const ob::State *state) { return isStateValid(state); });
 
 
     //Defining the start new //@todo See if this works
@@ -212,8 +218,8 @@ void OmplPlanner::planTrajectory(const kindr::HomTransformQuatD& goal_pose) {
     ss.setGoal(goal);
 
     // Defining the planner
-    auto planner = std::make_shared<og::RRT>(si);
-//    auto planner = std::make_shared<og::RRTstar>(si);
+//    auto planner = std::make_shared<og::RRT>(si);
+    auto planner = std::make_shared<og::RRTstar>(si);
     planner->setRange(0.1);
     planner->setGoalBias(0.5);
     ss.setPlanner(planner);
@@ -284,14 +290,13 @@ void OmplPlanner::publishSolutionTrajectory(const std::vector<CurrentState>& sol
         ros::spinOnce();
         ros::Rate(25).sleep();
     }
-
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// Collision check
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-std::shared_ptr<VoxbloxCostConfig> OmplPlanner::setUpVoxbloxCostConfig() {
+void OmplPlanner::setUpVoxbloxCostConfig() {
     KinematicInterfaceConfig kinematicInterfaceConfig;
     kinematicInterfaceConfig.transformToolMount_X_Endeffector = settings_.transformWrist2_X_Endeffector;
     kinematicInterfaceConfig.transformBase_X_ArmMount = settings_.transformBase_X_ArmMount;
@@ -299,6 +304,8 @@ std::shared_ptr<VoxbloxCostConfig> OmplPlanner::setUpVoxbloxCostConfig() {
     kinematicInterfaceConfig.baseCOM = Eigen::Vector3d::Zero();
 
     auto kinematicInterfaceConfigPtr = std::make_shared<MabiKinematics<ad_scalar_t>>(kinematicInterfaceConfig);
+    //auto kinematicInterfaceConfigPtr = std::shared_ptr<KinematicsInterface<ad_scalar_t>>(kinematicInterfaceConfig)
+
 
     ros::NodeHandle pNh("~");
     std::shared_ptr<VoxbloxCostConfig> voxbloxCostConfig = nullptr;
@@ -311,21 +318,20 @@ std::shared_ptr<VoxbloxCostConfig> OmplPlanner::setUpVoxbloxCostConfig() {
         pNh.getParam("collision_points", collisionPoints);
         if (collisionPoints.getType() != XmlRpc::XmlRpcValue::TypeArray) {
             ROS_WARN("collision_points parameter is not of type array.");
-            return voxbloxCostConfig;
         }
         for (int i = 0; i < collisionPoints.size(); i++) {
             if (collisionPoints.getType() != XmlRpc::XmlRpcValue::TypeArray) {
                 ROS_WARN_STREAM("collision_points[" << i << "] parameter is not of type array.");
-                return voxbloxCostConfig;
+                break;
             }
             for (int j = 0; j < collisionPoints[i].size(); j++) {
                 if (collisionPoints[j].getType() != XmlRpc::XmlRpcValue::TypeArray) {
                     ROS_WARN_STREAM("collision_points[" << i << "][" << j << "] parameter is not of type array.");
-                    return voxbloxCostConfig;
+                    break;
                 }
                 if (collisionPoints[i][j].size() != 2) {
                     ROS_WARN_STREAM("collision_points[" << i << "][" << j << "] does not have 2 elements.");
-                    return voxbloxCostConfig;
+                    break;
                 }
                 double segmentId = collisionPoints[i][j][0];
                 double radius = collisionPoints[i][j][1];
@@ -345,21 +351,17 @@ std::shared_ptr<VoxbloxCostConfig> OmplPlanner::setUpVoxbloxCostConfig() {
             voxbloxCostConfig.reset(new VoxbloxCostConfig());
             voxbloxCostConfig->pointsOnRobot = pointsOnRobot_;
 
-            std::shared_ptr<voxblox::EsdfCachingServer> esdfCachingServer_;
             esdfCachingServer_.reset(new voxblox::EsdfCachingServer(ros::NodeHandle(), ros::NodeHandle("~")));
             voxbloxCostConfig->interpolator = esdfCachingServer_->getInterpolator();
 
             pointsOnRobot_->initialize("points_on_robot");
-//            pointsOnRobot_->initialize("points_on_robot","/tmp/ocs2",true);
-//            pointsOnRobot_->initialize("points_on_robot","/tmp/ocs2",false); //todo somehow this only works
+
         } else {
             // if there are no points defined for collision checking, set this pointer to null to disable the visualization
             pointsOnRobot_ = nullptr;
         }
     }
-    Eigen::VectorXd test_vec;
-    auto test = voxbloxCostConfig->pointsOnRobot->getPoints(test_vec);
+
     settings_.voxbloxCostConfig.swap(voxbloxCostConfig);
-    return voxbloxCostConfig;
 }
 

@@ -21,6 +21,7 @@
 #include "VoxbloxStateValidityChecker.h"
 #include "ocs2_core/Dimensions.h"
 #include "perceptive_mpc/EsdfCachingServer.hpp"
+#include "voxblox_msgs/FilePath.h"
 
 //OMPL Setup
 #include <ompl/base/goals/GoalRegion.h>
@@ -60,13 +61,12 @@ struct Settings {
     Eigen::Matrix4d transformBase_X_ArmMount = Eigen::Matrix4d::Identity();
     Eigen::Matrix4d transformWrist2_X_Endeffector = Eigen::Matrix4d::Identity();
 
-    double maxPlanningTime = 30;
+    double maxPlanningTime = 20;
     double positionTolerance = 0.3; //todo was 0.1
     double orientationTolerance = 100;
 
     std::shared_ptr<VoxbloxCostConfig> voxbloxCostConfig = nullptr;
 };
-
 
 
 class OmplPlanner {
@@ -79,8 +79,6 @@ public:
     OmplPlanner() = default;
     ~OmplPlanner()= default;
 
-    ompl::base::GoalPtr convertPoseToOmplGoal(const kindr::HomTransformQuatD& goal_pose);
-    void planTrajectory(const kindr::HomTransformQuatD& goal_pose);
 
     struct CurrentState {
         Eigen::Vector2d position2DBase;
@@ -104,20 +102,33 @@ private:
     ros::Publisher pubArmState_;
     ros::Rate r_;
 
+    // To initialize
     Settings settings_;
     CurrentState currentState_;
     KinematicInterfaceConfig kinematicInterfaceConfig_;
+    ros::ServiceClient serviceLoadMap_;
 
     // Solution to planning problem
     PlannerOutput solutionTrajectory_;
     std::vector<CurrentState> test;
 
+    //For Voxblox
+    std::shared_ptr<voxblox::EsdfCachingServer> esdfCachingServer_;
+
     void initializeState();
-    void cbDesiredEndEffectorPose(const geometry_msgs::PoseStampedConstPtr& msgPtr);
-    void publishSolutionTrajectory(const std::vector<CurrentState>& solutionTrajectory);
-    std::shared_ptr<VoxbloxCostConfig> setUpVoxbloxCostConfig();
-    void testLoop();
     void initializeKinematicInterfaceConfig();
+    void testLoop();
+    void loadMap();
+
+    void cbDesiredEndEffectorPose(const geometry_msgs::PoseStampedConstPtr& msgPtr);
+    void planTrajectory(const kindr::HomTransformQuatD& goal_pose);
+    void publishSolutionTrajectory(const std::vector<CurrentState>& solutionTrajectory);
+
+    ompl::base::GoalPtr convertPoseToOmplGoal(const kindr::HomTransformQuatD& goal_pose);
+    void setUpVoxbloxCostConfig();
+
+
+
 
 
 };

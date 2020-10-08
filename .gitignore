@@ -34,3 +34,6 @@
 # Ignoring Clion folders
 auto_generated/
 cmake-build-debug/
+
+*.xml
+*.iml

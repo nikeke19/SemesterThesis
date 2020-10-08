@@ -30,7 +30,7 @@ void OmplPlanner::initializeState() {
     //Setting up own State
     currentState_.position2DBase << 0,0;
     currentState_.yaw_base = 0;
-    currentState_.jointAngles << 0, -PI/2, -0.4 * PI, 0, -PI/2, 0;
+    currentState_.jointAngles << PI, -PI/2, -PI/4, 0, -PI/2, PI/4;
 
     //Setting up Transform for the base
     odomTrans_.header.frame_id = "odom";
@@ -69,12 +69,11 @@ void OmplPlanner::testLoop() {
 }
 
 void OmplPlanner::cbDesiredEndEffectorPose(const geometry_msgs::PoseStampedConstPtr &msgPtr) {
-    kindr::HomTransformQuatD goal_pose;  //todo set goal pose
-//    kindr_ros::convertFromRosGeometryMsg(msgPtr->pose, goal_pose);
+    kindr::HomTransformQuatD goal_pose;
     kindr_ros::convertFromRosGeometryMsg(msgPtr->pose, goal_pose);
 
     ROS_ERROR("OMPL: Received Desired End Effector CB");
-    planTrajectory(goal_pose);  //todo start position could be removed
+    planTrajectory(goal_pose);
 }
 
 ompl::base::GoalPtr OmplPlanner::convertPoseToOmplGoal(const kindr::HomTransformQuatD& goal_pose) {
@@ -227,7 +226,7 @@ void OmplPlanner::publishSolutionTrajectory(const std::vector<CurrentState>& sol
         pubArmState_.publish(jointState_);
         tfOdomBroadcaster_.sendTransform(odomTrans_);
         ros::spinOnce();
-        ros::Rate(10).sleep();
+        ros::Rate(25).sleep();
     }
 
 }

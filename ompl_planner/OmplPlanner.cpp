@@ -19,12 +19,16 @@ OmplPlanner::OmplPlanner(const ros::NodeHandle& nodeHandle) : nh_(nodeHandle), r
 
     //ros::Duration(15).sleep();
     initializeState();
+    initializeKinematicInterfaceConfig();
 }
 //@todo for debug
 bool isStateValid(const ob::State *state) {
     return true;
 }
 
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// Initialize
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void OmplPlanner::initializeState() {
     //Setting up own State
@@ -68,6 +72,59 @@ void OmplPlanner::testLoop() {
     }
 }
 
+void OmplPlanner::initializeKinematicInterfaceConfig() {
+    MabiKinematics<double> kinematics(kinematicInterfaceConfig_);
+    tf2_ros::Buffer tfBuffer;
+    tf2_ros::TransformListener tfListener(tfBuffer);
+    {
+        geometry_msgs::TransformStamped transformStamped;
+        try {
+            transformStamped = tfBuffer.lookupTransform("base_link", kinematics.armMountLinkName(), ros::Time(0), ros::Duration(1.0));
+        } catch (tf2::TransformException& ex) {
+            ROS_ERROR("%s", ex.what());
+            throw;
+        }
+        Eigen::Quaterniond quat(transformStamped.transform.rotation.w, transformStamped.transform.rotation.x,
+                                transformStamped.transform.rotation.y, transformStamped.transform.rotation.z);
+
+        kinematicInterfaceConfig_.transformBase_X_ArmMount = Eigen::Matrix4d::Identity();
+        kinematicInterfaceConfig_.transformBase_X_ArmMount.block<3, 3>(0, 0) = quat.toRotationMatrix();
+
+        kinematicInterfaceConfig_.transformBase_X_ArmMount(0, 3) = transformStamped.transform.translation.x;
+        kinematicInterfaceConfig_.transformBase_X_ArmMount(1, 3) = transformStamped.transform.translation.y;
+        kinematicInterfaceConfig_.transformBase_X_ArmMount(2, 3) = transformStamped.transform.translation.z;
+        ROS_INFO_STREAM("baseToArmMount_: " << std::endl << kinematicInterfaceConfig_.transformBase_X_ArmMount);
+    }
+
+    {
+        geometry_msgs::TransformStamped transformStamped;
+        try {
+            transformStamped = tfBuffer.lookupTransform(kinematics.toolMountLinkName(), "ENDEFFECTOR", ros::Time(0), ros::Duration(1.0));
+        } catch (tf2::TransformException& ex) {
+            ROS_ERROR("%s", ex.what());
+            throw;
+        }
+        Eigen::Quaterniond quat(transformStamped.transform.rotation.w, transformStamped.transform.rotation.x,
+                                transformStamped.transform.rotation.y, transformStamped.transform.rotation.z);
+
+        kinematicInterfaceConfig_.transformToolMount_X_Endeffector = Eigen::Matrix4d::Identity();
+        kinematicInterfaceConfig_.transformToolMount_X_Endeffector.block<3, 3>(0, 0) = quat.toRotationMatrix();
+
+        kinematicInterfaceConfig_.transformToolMount_X_Endeffector(0, 3) = transformStamped.transform.translation.x;
+        kinematicInterfaceConfig_.transformToolMount_X_Endeffector(1, 3) = transformStamped.transform.translation.y;
+        kinematicInterfaceConfig_.transformToolMount_X_Endeffector(2, 3) = transformStamped.transform.translation.z;
+        ROS_INFO_STREAM("wrist2ToEETransform_: " << std::endl << kinematicInterfaceConfig_.transformToolMount_X_Endeffector);
+    }
+
+    //Writing everything to settings:
+    settings_.transformBase_X_ArmMount = kinematicInterfaceConfig_.transformBase_X_ArmMount;
+    settings_.transformWrist2_X_Endeffector = kinematicInterfaceConfig_.transformToolMount_X_Endeffector;
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// Calculating Goal
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
 void OmplPlanner::cbDesiredEndEffectorPose(const geometry_msgs::PoseStampedConstPtr &msgPtr) {
     kindr::HomTransformQuatD goal_pose;
     kindr_ros::convertFromRosGeometryMsg(msgPtr->pose, goal_pose);
@@ -96,6 +153,10 @@ ompl::base::GoalPtr OmplPlanner::convertPoseToOmplGoal(const kindr::HomTransform
     auto endEffectorGoal = std::make_shared<EndEffectorGoal>(ss.getSpaceInformation(), eeGoalSettings);
     return endEffectorGoal;
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// Planning Trajectory
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void OmplPlanner::planTrajectory(const kindr::HomTransformQuatD& goal_pose) {
     ROS_ERROR("OMPL: Create State Space ");
@@ -151,16 +212,10 @@ void OmplPlanner::planTrajectory(const kindr::HomTransformQuatD& goal_pose) {
     ss.setGoal(goal);
 
     // Defining the planner
-    // auto planner = std::make_shared<og::RRTXstatic>(si);
-    // auto planner = std::make_shared<og::RRTConnect>(si);
-//    auto planner = std::make_shared<og::BFMT>(si);
     auto planner = std::make_shared<og::RRT>(si);
 //    auto planner = std::make_shared<og::RRTstar>(si);
     planner->setRange(0.1);
     planner->setGoalBias(0.5);
-//    planner->setExtendedFMT(true);
-//    planner->setTermination(true);
-//    planner->setNumSamples(10000);
     ss.setPlanner(planner);
     ss.setup();
 
@@ -168,8 +223,6 @@ void OmplPlanner::planTrajectory(const kindr::HomTransformQuatD& goal_pose) {
               << std::endl;
 
     ob::PlannerStatus solved = ss.solve(settings_.maxPlanningTime);
-    ROS_ERROR("Solved");
-    // ob::PlannerStatus solved = ss.solve(exactSolnPlannerTerminationCondition(ss.getProblemDefinition()));
 
     if (solved) {
         std::cout << "Solved:" << solved.asString() << std::endl;
@@ -204,9 +257,12 @@ void OmplPlanner::planTrajectory(const kindr::HomTransformQuatD& goal_pose) {
     }
     else {
         std::cout << "No solution found after" << settings_.maxPlanningTime << "s." << std::endl;
-//        return nullptr;
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// Publish to RVIZ
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void OmplPlanner::publishSolutionTrajectory(const std::vector<CurrentState>& solutionTrajectory) {
     for(int i = 0; i < solutionTrajectory.size() && ros::ok(); i++) {
@@ -230,6 +286,10 @@ void OmplPlanner::publishSolutionTrajectory(const std::vector<CurrentState>& sol
     }
 
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// Collision check
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 std::shared_ptr<VoxbloxCostConfig> OmplPlanner::setUpVoxbloxCostConfig() {
     KinematicInterfaceConfig kinematicInterfaceConfig;
@@ -303,4 +363,3 @@ std::shared_ptr<VoxbloxCostConfig> OmplPlanner::setUpVoxbloxCostConfig() {
     return voxbloxCostConfig;
 }
 
-void OmplPlanner::publishArmState() {}

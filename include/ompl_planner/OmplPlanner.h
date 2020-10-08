@@ -96,24 +96,28 @@ public:
 private:
     ros::NodeHandle nh_;
     ros::Subscriber subDesiredEndEffectorPoseSubscriber_;
-    ros::Publisher pubArmState_;
+
+    // To publish to RVIZ Simulation
     tf::TransformBroadcaster tfOdomBroadcaster_;
     geometry_msgs::TransformStamped odomTrans_;
     sensor_msgs::JointState jointState_;
+    ros::Publisher pubArmState_;
     ros::Rate r_;
 
     Settings settings_;
     CurrentState currentState_;
+    KinematicInterfaceConfig kinematicInterfaceConfig_;
+
+    // Solution to planning problem
     PlannerOutput solutionTrajectory_;
     std::vector<CurrentState> test;
 
     void initializeState();
     void cbDesiredEndEffectorPose(const geometry_msgs::PoseStampedConstPtr& msgPtr);
-    void publishArmState();
-    void publishBaseTransform();
     void publishSolutionTrajectory(const std::vector<CurrentState>& solutionTrajectory);
     std::shared_ptr<VoxbloxCostConfig> setUpVoxbloxCostConfig();
     void testLoop();
+    void initializeKinematicInterfaceConfig();
 
 
 };

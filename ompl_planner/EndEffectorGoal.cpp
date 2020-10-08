@@ -8,7 +8,7 @@
 
 #include "ompl_planner/EndEffectorGoal.h"
 
-const bool DEBUG = false;
+const bool DEBUG = true;
 int DEBUG_INT = 0;
 
 using namespace perceptive_mpc;
@@ -39,36 +39,29 @@ double EndEffectorGoal::distanceGoal(const State* st) const {
 
   double angularError =
       std::abs(settings_.goal.getRotation().toImplementation().angularDistance(Eigen::Quaterniond(endEffectorPose.block<3, 3>(0, 0))));
-//  double positionError = (endEffectorPose.block<3, 1>(0, 3) - settings_.goal.getPosition().toImplementation()).norm();
+  double positionError = (endEffectorPose.block<3, 1>(0, 3) - settings_.goal.getPosition().toImplementation()).norm();
 
-  Eigen::Vector3d test(-endEffectorPose(1,3) -0.134, endEffectorPose(0,3), endEffectorPose(2,3)+0.25);
-  double positionError = (test - settings_.goal.getPosition().toImplementation()).norm();
-
-    if(DEBUG && DEBUG_INT == 0) {
-        std::cout << "Mpc State" << std::endl;
-        std::cout << mpcState << std::endl <<std::endl;
-        std::cout << "endEffector Transformation" <<std::endl;
-        std::cout << endEffectorPose<<std::endl << std::endl;
-        std::cout << "endEffector Goal" <<std::endl;
-        std::cout << settings_.goal.getPosition().vector()<<std::endl << std::endl;
-        std::cout << "corrected Endeffector position" <<std::endl;
-        std::cout << test<<std::endl << std::endl;
-        DEBUG_INT++;
-    }
-
-    if(std::max(positionError / settings_.positionTolerance, angularError / settings_.angularTolerance) < 1){
-        std::cout << "Achieved Tolerance" << std::endl;
-        std::cout << "Mpc State" << std::endl;
-        std::cout << mpcState << std::endl <<std::endl;
-        std::cout << "endEffector Transformation" <<std::endl;
-        std::cout << endEffectorPose<<std::endl << std::endl;
-        std::cout << "endEffector Goal" <<std::endl;
-        std::cout << settings_.goal.getPosition().vector()<<std::endl << std::endl;
-        std::cout << "corrected Endeffector position" <<std::endl;
-        std::cout << test<<std::endl << std::endl;
-        std::cout << "Position base x: " << st->as<MabiStateSpace::StateType>()->basePoseState()->getX()
-        <<" Position base y" << st->as<MabiStateSpace::StateType>()->basePoseState()->getY() << std::endl;
-    }
+//    if(DEBUG && DEBUG_INT == 0) {
+//        std::cout << "Mpc State" << std::endl;
+//        std::cout << mpcState << std::endl <<std::endl;
+//        std::cout << "endEffector Transformation" <<std::endl;
+//        std::cout << endEffectorPose<<std::endl << std::endl;
+//        std::cout << "endEffector Goal" <<std::endl;
+//        std::cout << settings_.goal.getPosition().vector()<<std::endl << std::endl;
+//        DEBUG_INT++;
+//    }
+//
+//    if(std::max(positionError / settings_.positionTolerance, angularError / settings_.angularTolerance) < 1){
+//        std::cout << "Achieved Tolerance" << std::endl;
+//        std::cout << "Mpc State" << std::endl;
+//        std::cout << mpcState << std::endl <<std::endl;
+//        std::cout << "endEffector Transformation" <<std::endl;
+//        std::cout << endEffectorPose<<std::endl << std::endl;
+//        std::cout << "endEffector Goal" <<std::endl;
+//        std::cout << settings_.goal.getPosition().vector()<<std::endl << std::endl;
+//        std::cout << "Position base x: " << st->as<MabiStateSpace::StateType>()->basePoseState()->getX()
+//        <<" Position base y" << st->as<MabiStateSpace::StateType>()->basePoseState()->getY() << std::endl;
+//    }
 
   return std::max(positionError / settings_.positionTolerance, angularError / settings_.angularTolerance);
 }

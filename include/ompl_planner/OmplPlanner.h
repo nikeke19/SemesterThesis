@@ -35,7 +35,6 @@
 #include <ompl/geometric/planners/rrt/RRTXstatic.h>
 #include <ompl/geometric/planners/rrt/RRT.h>
 #include <ompl/geometric/planners/rrt/RRTstar.h>
-#include <ompl/geometric/planners/informedtrees/ABITstar.h>
 
 // test if it helps:
 #include <ocs2_core/automatic_differentiation/CppAdInterface.h>

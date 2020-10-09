@@ -123,6 +123,7 @@ void OmplPlanner::initializeKinematicInterfaceConfig() {
     //Writing everything to settings:
     settings_.transformBase_X_ArmMount = kinematicInterfaceConfig_.transformBase_X_ArmMount;
     settings_.transformWrist2_X_Endeffector = kinematicInterfaceConfig_.transformToolMount_X_Endeffector;
+    kinematicsInterface_ = std::make_shared<MabiKinematics<ad_scalar_t>>(kinematicInterfaceConfig_);
 }
 
 void OmplPlanner::loadMap() {
@@ -218,8 +219,8 @@ void OmplPlanner::planTrajectory(const kindr::HomTransformQuatD& goal_pose) {
     ss.setGoal(goal);
 
     // Defining the planner
-//    auto planner = std::make_shared<og::RRT>(si);
-    auto planner = std::make_shared<og::RRTstar>(si);
+    auto planner = std::make_shared<og::RRT>(si);
+//    auto planner = std::make_shared<og::RRTstar>(si);
     planner->setRange(0.1);
     planner->setGoalBias(0.5);
     ss.setPlanner(planner);
@@ -304,7 +305,7 @@ void OmplPlanner::setUpVoxbloxCostConfig() {
     kinematicInterfaceConfig.baseCOM = Eigen::Vector3d::Zero();
 
     auto kinematicInterfaceConfigPtr = std::make_shared<MabiKinematics<ad_scalar_t>>(kinematicInterfaceConfig);
-    //auto kinematicInterfaceConfigPtr = std::shared_ptr<KinematicsInterface<ad_scalar_t>>(kinematicInterfaceConfig)
+//    auto kinematicInterfaceConfigPtr = std::shared_ptr<KinematicsInterface<ad_scalar_t>>(kinematicInterfaceConfig)
 
 
     ros::NodeHandle pNh("~");
@@ -342,7 +343,8 @@ void OmplPlanner::setUpVoxbloxCostConfig() {
         perceptive_mpc::PointsOnRobotConfig config;
         config.pointsAndRadii = pointsAndRadii;
         using ad_type = CppAD::AD<CppAD::cg::CG<double>>;
-        config.kinematics = kinematicInterfaceConfigPtr;
+        config.kinematics = kinematicInterfaceConfigPtr; //todo commented out to try below
+//        config.kinematics = kinematicInterfaceConfig_;
 
         std::shared_ptr<PointsOnRobot> pointsOnRobot_;
         pointsOnRobot_.reset(new perceptive_mpc::PointsOnRobot(config));
@@ -362,6 +364,7 @@ void OmplPlanner::setUpVoxbloxCostConfig() {
         }
     }
 
-    settings_.voxbloxCostConfig.swap(voxbloxCostConfig);
+    //settings_.voxbloxCostConfig.swap(voxbloxCostConfig);
+    settings_.voxbloxCostConfig = voxbloxCostConfig; //problem, that this is not a pointer?
 }
 

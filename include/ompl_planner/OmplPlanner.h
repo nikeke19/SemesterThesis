@@ -107,6 +107,7 @@ private:
     CurrentState currentState_;
     KinematicInterfaceConfig kinematicInterfaceConfig_;
     ros::ServiceClient serviceLoadMap_;
+    std::shared_ptr<KinematicsInterfaceAD> kinematicsInterface_;
 
     // Solution to planning problem
     PlannerOutput solutionTrajectory_;

@@ -19,12 +19,15 @@ VoxbloxStateValidityChecker::VoxbloxStateValidityChecker(SpaceInformation* si, s
 VoxbloxStateValidityChecker::~VoxbloxStateValidityChecker() = default;
 
 bool VoxbloxStateValidityChecker::isValid(const State* state) const {
-  return clearance(state) > 0;
+  double distance = clearance(state);
+  std::cout << distance << std::endl; //todo debug, delivers always the same clearance
+  return distance > 0;
 }
 
 double VoxbloxStateValidityChecker::clearance(const State* state) const {
   Eigen::VectorXd mpcState;
   omplToMpcState(state->as<MabiState>(), mpcState);
+  //std::cout << mpcState << std::endl << std::endl; //todo, seems okay, always different mpc state
   std::lock_guard<std::mutex> costLock(costMutex_);
   voxbloxCost_->setCurrentStateAndControl(0, mpcState.head<Definitions::STATE_DIM_>(), VoxbloxCost::input_vector_t::Zero());
   return voxbloxCost_->getMinDistance();

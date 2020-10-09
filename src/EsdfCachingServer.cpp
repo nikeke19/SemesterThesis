@@ -27,6 +27,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+//Läuft die ganze Zeit im Hintergrund und Updated Karte -> Ausstellen? //suche nach subscriber
+
 #include <perceptive_mpc/EsdfCachingServer.hpp>
 
 namespace voxblox {
@@ -59,6 +61,7 @@ std::shared_ptr<voxblox::Interpolator<voxblox::EsdfCachingVoxel>> EsdfCachingSer
 void EsdfCachingServer::updateInterpolator() {
   std::lock_guard<std::mutex> lockGuard(cacheMutex_);
   if (cachedCachingLayer_) {
+    ROS_WARN("Map found");
     currentCachingLayer_ = cachedCachingLayer_;
     cachedCachingLayer_ = nullptr;
     *interpolator_ = voxblox::Interpolator<EsdfCachingVoxel>(currentCachingLayer_.get());

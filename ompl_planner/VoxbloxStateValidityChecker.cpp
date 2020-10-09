@@ -20,7 +20,7 @@ VoxbloxStateValidityChecker::~VoxbloxStateValidityChecker() = default;
 
 bool VoxbloxStateValidityChecker::isValid(const State* state) const {
   double distance = clearance(state);
-  std::cout << distance << std::endl; //todo debug, delivers always the same clearance
+  //std::cout << distance << std::endl; //todo debug, delivers always the same clearance
   return distance > 0;
 }
 

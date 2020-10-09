@@ -39,7 +39,7 @@ void OmplPlanner::initializeState() {
     //Setting up own State
     currentState_.position2DBase << 0,0;
     currentState_.yaw_base = 0;
-    currentState_.jointAngles << 0, -PI/2, -PI/4, 0, -PI/2, PI/4;
+    currentState_.jointAngles << 0, -PI/2, 0, 0, -PI/2, PI/4;
 
     //Setting up Transform for the base
     odomTrans_.header.frame_id = "odom";
@@ -278,6 +278,7 @@ void OmplPlanner::publishSolutionTrajectory(const std::vector<CurrentState>& sol
         odomTrans_.header.stamp = ros::Time::now();
         odomTrans_.transform.translation.x = solutionTrajectory[i].position2DBase.x();
         odomTrans_.transform.translation.y = solutionTrajectory[i].position2DBase.y();
+        odomTrans_.transform.translation.z = 0.0;
         odomTrans_.transform.rotation = tf::createQuaternionMsgFromYaw(solutionTrajectory[i].yaw_base);
 
         //Setting up the joint state

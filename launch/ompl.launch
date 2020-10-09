@@ -40,7 +40,7 @@
     <node pkg="perceptive_mpc" name="ompl_planner" type="perceptive_mpc_ompl_planner" output="screen"> <!-- launch-prefix="gdb -ex run &#45;&#45;args"-->
         <rosparam file="$(find perceptive_mpc)/config/voxblox.yaml"/>
         <rosparam file="$(find perceptive_mpc)/config/kinematic_simulation_parameters.yaml"/>
-        <remap from="/kinematic_simulation/esdf_map_in" to="esdf_map" />
+        <remap from="~esdf_map_in" to="/esdf_map" />
     </node>
 
     <node name="interactive_pose_node" pkg="perceptive_mpc" type="interactive_marker.py" output="screen"/>

@@ -73,6 +73,8 @@ public:
     using DIMENSIONS = ocs2::Dimensions<Definitions::STATE_DIM_, Definitions::INPUT_DIM_>;
     using state_vector_t = typename DIMENSIONS::state_vector_t;
     using input_vector_t = typename DIMENSIONS::input_vector_t;
+    typedef ocs2::SystemObservation<perceptive_mpc::STATE_DIM_, perceptive_mpc::INPUT_DIM_> Observation;
+
 
     explicit OmplPlanner(const ros::NodeHandle& nodeHandle);
     OmplPlanner() = default;
@@ -99,7 +101,9 @@ private:
     geometry_msgs::TransformStamped odomTrans_;
     sensor_msgs::JointState jointState_;
     ros::Publisher pubArmState_;
+    ros::Publisher pointsOnRobotPublisher_;
     ros::Rate r_;
+    std::shared_ptr<PointsOnRobot> pointsOnRobot_;
 
     // To initialize
     Settings settings_;
@@ -126,6 +130,7 @@ private:
 
     ompl::base::GoalPtr convertPoseToOmplGoal(const kindr::HomTransformQuatD& goal_pose);
     void setUpVoxbloxCostConfig();
+    void visualizeCollisionPoints(const geometry_msgs::TransformStamped& base, sensor_msgs::JointState joints);
 
 
 

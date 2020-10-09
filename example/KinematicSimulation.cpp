@@ -44,7 +44,7 @@ bool KinematicSimulation::run() {
   parseParameters();
   loadTransforms();
 
-  //ros::Duration(15).sleep(); //@ Nick for debug
+  ros::Duration(15).sleep(); //@ Nick for debug
 
   kinematicInterfaceConfig_.baseMass = 70;
   kinematicInterfaceConfig_.baseCOM = Eigen::Vector3d::Zero();
@@ -546,8 +546,5 @@ std::shared_ptr<VoxbloxCostConfig> KinematicSimulation::configureCollisionAvoida
       pointsOnRobot_ = nullptr;
     }
   }
-
-  Eigen::VectorXd test_vec;
-  auto test = voxbloxCostConfig->pointsOnRobot->getPoints(test_vec);
   return voxbloxCostConfig;
 }

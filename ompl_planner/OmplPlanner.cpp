@@ -14,6 +14,7 @@ OmplPlanner::OmplPlanner(const ros::NodeHandle& nodeHandle) : nh_(nodeHandle), r
     subDesiredEndEffectorPoseSubscriber_ =
             nh_.subscribe("/perceptive_mpc/desired_end_effector_pose", 1, &OmplPlanner::cbDesiredEndEffectorPose, this);
     pubArmState_ = nh_.advertise<sensor_msgs::JointState>("/joint_states", 10);
+    pointsOnRobotPublisher_ = nh_.advertise<visualization_msgs::MarkerArray>("/perceptive_mpc/collision_points", 1, false);
     while(ros::ok() && pubArmState_.getNumSubscribers() == 0)
         ros::Rate(100).sleep();
     serviceLoadMap_ = nh_.serviceClient<voxblox_msgs::FilePath>("/voxblox_node/load_map");
@@ -288,6 +289,7 @@ void OmplPlanner::publishSolutionTrajectory(const std::vector<CurrentState>& sol
         //publishing base transform and joint states
         pubArmState_.publish(jointState_);
         tfOdomBroadcaster_.sendTransform(odomTrans_);
+        visualizeCollisionPoints(odomTrans_, jointState_);
         ros::spinOnce();
         ros::Rate(25).sleep();
     }
@@ -346,7 +348,7 @@ void OmplPlanner::setUpVoxbloxCostConfig() {
         config.kinematics = kinematicInterfaceConfigPtr; //todo commented out to try below
 //        config.kinematics = kinematicInterfaceConfig_;
 
-        std::shared_ptr<PointsOnRobot> pointsOnRobot_;
+        //std::shared_ptr<PointsOnRobot> pointsOnRobot_;
         pointsOnRobot_.reset(new perceptive_mpc::PointsOnRobot(config));
 
         if (pointsOnRobot_->numOfPoints() > 0) {
@@ -366,5 +368,37 @@ void OmplPlanner::setUpVoxbloxCostConfig() {
 
     //settings_.voxbloxCostConfig.swap(voxbloxCostConfig);
     settings_.voxbloxCostConfig = voxbloxCostConfig; //problem, that this is not a pointer?
+
+
+
+    // To visualize
+    geometry_msgs::TransformStamped quaternion;
+    quaternion.transform.translation.x = currentState_.position2DBase.x();
+    quaternion.transform.translation.y = currentState_.position2DBase.y();
+    quaternion.transform.translation.z = 0;
+    quaternion.transform.rotation = tf::createQuaternionMsgFromYaw(currentState_.yaw_base);
+    sensor_msgs::JointState joints;
+    joints.position.resize(6);
+    for(int i=0; i < joints.position.size(); i++)
+        joints.position[i] = currentState_.jointAngles[i];
+
+    visualizeCollisionPoints(quaternion, joints);
+
+}
+
+void OmplPlanner::visualizeCollisionPoints(const geometry_msgs::TransformStamped& base, sensor_msgs::JointState joints) {
+    Eigen::Matrix<double, 4, 1> quat(base.transform.rotation.w, base.transform.rotation.x,
+                                     base.transform.rotation.y, base.transform.rotation.z);
+    Eigen::Matrix<double, 3,1> positionBase(base.transform.translation.x, base.transform.translation.y, base.transform.translation.z);
+    Eigen::Matrix<double, 6,1> jointsMatrix;
+    for(int i = 0; i < joints.position.size(); i++)
+        jointsMatrix[i] = joints.position[i];
+
+    Eigen::Matrix<double, 13,1> state;
+    state.block<3,1>(0,0) = positionBase;
+    state.block<4,1>(3,0) = quat;
+    state.block<6,1>(7,0) = jointsMatrix;
+
+    pointsOnRobotPublisher_.publish(pointsOnRobot_->getVisualization(state));
 }
 

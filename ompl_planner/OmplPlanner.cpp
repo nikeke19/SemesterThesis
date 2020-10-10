@@ -130,6 +130,7 @@ void OmplPlanner::initializeKinematicInterfaceConfig() {
 void OmplPlanner::loadMap() {
     voxblox_msgs::FilePath srv;
     srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/example/example_map.esdf";
+//    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/maps/fixed_table.tsdf";
     serviceLoadMap_.waitForExistence();
     if (serviceLoadMap_.call(srv))
         ROS_INFO("Service load map called succesfully");
@@ -198,7 +199,7 @@ void OmplPlanner::planTrajectory(const kindr::HomTransformQuatD& goal_pose) {
     //Setting up the collision detection
     auto si = ss.getSpaceInformation();
     //setUpVoxbloxCostConfig();
-    esdfCachingServer_->updateInterpolator();
+    //esdfCachingServer_->updateInterpolator();
     auto voxbloxStateValidityChecker = std::make_shared<VoxbloxStateValidityChecker>(si.get(), settings_.voxbloxCostConfig);
     ss.setStateValidityChecker(voxbloxStateValidityChecker);
 
@@ -368,7 +369,7 @@ void OmplPlanner::setUpVoxbloxCostConfig() {
     }
 
     //settings_.voxbloxCostConfig.swap(voxbloxCostConfig);
-    settings_.voxbloxCostConfig = voxbloxCostConfig; //problem, that this is not a pointer?
+    settings_.voxbloxCostConfig = voxbloxCostConfig;
 
 
 

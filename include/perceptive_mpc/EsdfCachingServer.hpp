@@ -40,6 +40,8 @@ class EsdfCachingServer : virtual public EsdfServer {
   void esdfMapCallback(const voxblox_msgs::Layer& layer_msg) override;
   std::shared_ptr<voxblox::Interpolator<voxblox::EsdfCachingVoxel>> getInterpolator();
   void updateInterpolator();
+  void disableMeshUpdate();
+  void enableMeshUpdate();
 
  private:
   using esdf_caching_layer_ptr = std::shared_ptr<voxblox::Layer<voxblox::EsdfCachingVoxel>>;
@@ -48,5 +50,7 @@ class EsdfCachingServer : virtual public EsdfServer {
   esdf_caching_layer_ptr currentCachingLayer_ = nullptr;
   esdf_caching_layer_ptr cachedCachingLayer_ = nullptr;
   std::shared_ptr<voxblox::Interpolator<voxblox::EsdfCachingVoxel>> interpolator_ = nullptr;
+
+  bool meshUpdate_ = true;
 };
 } /* namespace voxblox */

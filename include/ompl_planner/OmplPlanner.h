@@ -61,7 +61,7 @@ struct Settings {
     Eigen::Matrix4d transformWrist2_X_Endeffector = Eigen::Matrix4d::Identity();
 
     double maxPlanningTime = 20;
-    double positionTolerance = 0.3; //todo was 0.1
+    double positionTolerance = 0.05; //todo was 0.1
     double orientationTolerance = 100;
 
     std::shared_ptr<VoxbloxCostConfig> voxbloxCostConfig = nullptr;

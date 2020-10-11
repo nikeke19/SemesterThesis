@@ -31,8 +31,8 @@ class MabiStateSpace : public CompoundStateSpace {
   typedef MabiState StateType;
 
   MabiStateSpace() {
-    //addSubspace(StateSpacePtr(new SE2StateSpace()), 1.0);
-    addSubspace(StateSpacePtr(new ReedsSheppStateSpace(0.1)), 1.0);
+    addSubspace(StateSpacePtr(new SE2StateSpace()), 1.0);
+//    addSubspace(StateSpacePtr(new ReedsSheppStateSpace(0.1)), 1.0);
     addSubspace(StateSpacePtr(new RealVectorStateSpace(ARM_STATE_DIM)), 1.0);
   }
   const std::shared_ptr<SE2StateSpace> basePoseStateSpace() { return std::static_pointer_cast<SE2StateSpace>(getSubspace(0)); }

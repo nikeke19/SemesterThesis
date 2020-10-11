@@ -14,7 +14,7 @@ OmplPlanner::OmplPlanner(const ros::NodeHandle& nodeHandle) : nh_(nodeHandle), r
     subDesiredEndEffectorPoseSubscriber_ =
             nh_.subscribe("/perceptive_mpc/desired_end_effector_pose", 1, &OmplPlanner::cbDesiredEndEffectorPose, this);
     pubArmState_ = nh_.advertise<sensor_msgs::JointState>("/joint_states", 10);
-    pointsOnRobotPublisher_ = nh_.advertise<visualization_msgs::MarkerArray>("/perceptive_mpc/collision_points", 1, false);
+    pubPointsOnRobot_ = nh_.advertise<visualization_msgs::MarkerArray>("/perceptive_mpc/collision_points", 1, false);
     while(ros::ok() && pubArmState_.getNumSubscribers() == 0)
         ros::Rate(100).sleep();
     serviceLoadMap_ = nh_.serviceClient<voxblox_msgs::FilePath>("/voxblox_node/load_map");
@@ -23,12 +23,7 @@ OmplPlanner::OmplPlanner(const ros::NodeHandle& nodeHandle) : nh_(nodeHandle), r
     initializeState();
     initializeKinematicInterfaceConfig();
     loadMap();
-    ros::Duration(10).sleep();
     setUpVoxbloxCostConfig();
-}
-//@todo for debug
-bool isStateValid(const ob::State *state) {
-    return true;
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -129,13 +124,14 @@ void OmplPlanner::initializeKinematicInterfaceConfig() {
 
 void OmplPlanner::loadMap() {
     voxblox_msgs::FilePath srv;
-    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/example/example_map.esdf";
+//    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/example/example_map.esdf";
 //    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/maps/fixed_table2.tsdf";
+    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/maps/example_map.esdf";
     serviceLoadMap_.waitForExistence();
     if (serviceLoadMap_.call(srv))
         ROS_INFO("Service load map called succesfully");
     else
-        ROS_ERROR("Could not load map, try manually");
+        ROS_WARN("Could not load map, retry manually");
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -200,16 +196,9 @@ void OmplPlanner::planTrajectory(const kindr::HomTransformQuatD& goal_pose) {
     auto si = ss.getSpaceInformation();
     //setUpVoxbloxCostConfig();
     esdfCachingServer_->updateInterpolator();
-    auto voxbloxStateValidityChecker = std::make_shared<VoxbloxStateValidityChecker>(si.get(), settings_.voxbloxCostConfig);
+    //auto voxbloxStateValidityChecker = std::make_shared<VoxbloxStateValidityChecker>(si.get(), settings_.voxbloxCostConfig);
+    std::shared_ptr<VoxbloxStateValidityChecker> voxbloxStateValidityChecker = std::make_shared<VoxbloxStateValidityChecker>(si.get(), settings_.voxbloxCostConfig);
     ss.setStateValidityChecker(voxbloxStateValidityChecker);
-
-    //New to disable continious mesh update
-    esdfCachingServer_->disableMeshUpdate();
-
-    //todo alternative to only run
-//    auto si = ss.getSpaceInformation();
-//    ss.setStateValidityChecker([](const ob::State *state) { return isStateValid(state); });
-
 
     // Defining the start
     ob::ScopedState<MabiStateSpace> start(space);
@@ -247,6 +236,8 @@ void OmplPlanner::planTrajectory(const kindr::HomTransformQuatD& goal_pose) {
         //Object to store solution in
         std::vector<CurrentState> solutionTrajectory;
         solutionTrajectory.resize(ss.getSolutionPath().getStateCount());
+        std::cout <<"state count is" << ss.getSolutionPath().getStateCount();
+
 
         int i = 0;
         for (const auto& state : ss.getSolutionPath().getStates()) {
@@ -264,6 +255,18 @@ void OmplPlanner::planTrajectory(const kindr::HomTransformQuatD& goal_pose) {
         }
 
         publishSolutionTrajectory(solutionTrajectory);
+
+        if(writeSolutionTrajectoryToFile_)
+            writeTrajectoryToFile(solutionTrajectory, "test");
+
+        if(writeConditioningToFile_)
+            writeConditioningToFile(ss.getSolutionPath().getState(n_points-1)->as<MabiState>(), solutionTrajectory[0], "test");
+
+        if(writeOccupancyGridToFile_)
+            writeOccupancyGridToFile(0.1, "test");
+            //writeOccupancyGridToFile(voxbloxStateValidityChecker, 0.2);
+
+
         ROS_WARN("Achieved Output");
 
     }
@@ -273,7 +276,7 @@ void OmplPlanner::planTrajectory(const kindr::HomTransformQuatD& goal_pose) {
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/// Publish to RVIZ
+/// Publish Solution Trajectory to RVIZ
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void OmplPlanner::publishSolutionTrajectory(const std::vector<CurrentState>& solutionTrajectory) {
@@ -299,6 +302,138 @@ void OmplPlanner::publishSolutionTrajectory(const std::vector<CurrentState>& sol
         ros::Rate(25).sleep();
     }
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// Write Data to file
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+void OmplPlanner::writeTrajectoryToFile(const std::vector<CurrentState>& trajectory, const std::string& name) {
+    ROS_ERROR("Writing trajectory to file");
+
+    std::ofstream trajectoryFile;
+    trajectoryFile.open("/home/nick/Data/Table/" + name + "_trajectory.txt");
+
+    //Filling header of trajectory file:
+    trajectoryFile << "Position_x" << "," << "Position_y" << "," << "Yaw";
+    for (int k = 0; k < 6; k++)
+        trajectoryFile << "," << "Joint_" + std::to_string(k);
+    trajectoryFile << std::endl;
+
+    int n = trajectory.size();
+
+    //Filling trajectory file
+    for (int i = 1; i < n; i++) {
+        trajectoryFile << trajectory[i].position2DBase.x() << ","
+                        << trajectory[i].position2DBase.y() << ","
+                        << trajectory[i].yaw_base;
+        for (int k = 0; k < 6; k++)
+            trajectoryFile << "," << trajectory[i].jointAngles[k];
+
+        trajectoryFile << std::endl;
+    }
+    trajectoryFile.close();
+    ROS_ERROR("Writing finished");
+}
+
+void OmplPlanner::writeConditioningToFile(const MabiStateSpace::StateType* goalState, CurrentState startState ,std::string name) {
+    // Obtaining position and orientation of the Endeffector in the Goal State
+    Eigen::VectorXd goalMpcState;
+    Eigen::Matrix<double, 4, 4> goalEndeffectorTransform;
+    MabiKinematics<double> kinematics(kinematicInterfaceConfig_);
+    Eigen::Vector3d goalEndeffectorPosition;
+
+    omplToMpcState(goalState, goalMpcState);
+    kinematics.computeState2EndeffectorTransform(goalEndeffectorTransform, goalMpcState);
+    Eigen::Quaterniond goalEndeffectorRotation(goalEndeffectorTransform.block<3,3>(0, 0));
+    goalEndeffectorPosition = goalEndeffectorTransform.block<3,1>(0,3);
+
+    //Opening file
+    std::ofstream conditionFile;
+    conditionFile.open("/home/nick/Data/Table/" + name + "_condition.txt");
+
+    //Filling header
+    conditionFile << "Start_x" << "," << "Start_y" << "," << "Start_yaw" << "," << "Goal_x" << "," << "Goal_y" << ","
+                  << "Goal_z" << "," << "Goal_q_w" << "," << "Goal_q_x" << "," << "Goal_q_y" << "," << "Goal_q_z" << std::endl;
+    //Putting content in
+    conditionFile << startState.position2DBase.x() << "," << startState.position2DBase.y() << "," << startState.yaw_base
+                  << "," << goalEndeffectorPosition.x() << "," << goalEndeffectorPosition.y() << ","
+                  << goalEndeffectorPosition.z() << "," << goalEndeffectorRotation.w() << ","
+                  << goalEndeffectorRotation.x() << "," << goalEndeffectorRotation.y() << ","
+                  << goalEndeffectorRotation.z() << std::endl;
+    conditionFile.close();
+}
+
+void OmplPlanner::writeOccupancyGridToFile(const float resolution, const std::string name) {
+    ROS_WARN("Writing Occupancy Grid");
+    Eigen::Matrix<float, 3, 1> checkPoint;
+    float distance;
+    auto interpolator = esdfCachingServer_->getInterpolator();
+
+    const int n_x_points = int((settings_.maxBasePositionLimit(0) - settings_.minBasePositionLimit(0))/resolution) + 1;
+    const int n_y_points = int((settings_.maxBasePositionLimit(1) - settings_.minBasePositionLimit(1))/resolution) + 1;
+    const int n_z_points = int((settings_.minMaxHeight(1) - settings_.minMaxHeight(0))/resolution) + 1;
+
+
+    //Allocate Memory for 3D occupancy Grid
+    int*** occupancyGrid = new int**[n_x_points];
+    for (int i = 0; i < n_x_points; i++) {
+        occupancyGrid[i] = new int*[n_y_points];
+
+        for (int j = 0; j < n_y_points; j++)
+            occupancyGrid[i][j] = new int[n_z_points];
+    }
+
+    std::vector<Eigen::Matrix<float, 3, 1>> collisionPoints;
+    std::ofstream occupancyGridFile;
+    occupancyGridFile.open("/home/nick/Data/Table/" + name + "_occupancy_grid.txt");
+
+    //Filling header
+    //occupancyGridFile << "Start_x" << "," << "Start_y" << "," << "Start_z" << std::endl;
+    occupancyGridFile << "Grid_Points" << std::endl;
+
+
+    //Start to fill occupancy Grid
+    for(int i_x = 0; i_x < n_x_points; i_x++) {
+        for(int i_y = 0; i_y < n_y_points; i_y++) {
+            for(int i_z = 0; i_z < n_z_points; i_z++) {
+                checkPoint = {float(settings_.minBasePositionLimit[0] + i_x * resolution) ,
+                              float(settings_.minBasePositionLimit[1] + i_y * resolution),
+                              float(settings_.minMaxHeight[0] + i_z * resolution)};
+                interpolator->getInterpolatedDistance(checkPoint, &distance);
+
+                if(distance <= resolution / 2) {
+                    occupancyGrid[i_x][i_y][i_z] = 1;
+                    //z > 0 to ensure that ground is not included
+                    if(checkPoint.z() > 0.01)
+                        occupancyGridFile << 1 << std::endl;
+                    else
+                        occupancyGridFile << 0 << std::endl;
+
+
+                    // todo Only for debug
+                    if(checkPoint.z() > 0.01
+                       && checkPoint.x() < 2
+                       && checkPoint.x() > -2
+                       && checkPoint.y() < 2
+                       && checkPoint.y() > -2) {
+                        //occupancyGridFile << checkPoint.x() << "," << checkPoint.y() << "," << checkPoint.z() << std::endl;
+                        collisionPoints.insert(collisionPoints.end(), checkPoint);
+                        //std::cout << checkPoint << std::endl << std::endl;
+                    }
+                    
+                }
+                else {
+                    occupancyGrid[i_x][i_y][i_z] = 0;
+                    occupancyGridFile << 0 << std::endl;
+                }
+            }
+        }
+    }
+
+    ROS_WARN("Finished Occupancy Grid");
+    occupancyGridFile.close();
+    visualizeOccupancyGrid(collisionPoints);
+}
+
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// Collision check
@@ -386,8 +521,11 @@ void OmplPlanner::setUpVoxbloxCostConfig() {
         joints.position[i] = currentState_.jointAngles[i];
 
     visualizeCollisionPoints(quaternion, joints);
-
 }
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// Visualization in RVIZ
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void OmplPlanner::visualizeCollisionPoints(const geometry_msgs::TransformStamped& base, sensor_msgs::JointState joints) {
     Eigen::Matrix<double, 4, 1> quat(base.transform.rotation.w, base.transform.rotation.x,
@@ -402,6 +540,45 @@ void OmplPlanner::visualizeCollisionPoints(const geometry_msgs::TransformStamped
     state.block<4,1>(3,0) = quat;
     state.block<6,1>(7,0) = jointsMatrix;
 
-    pointsOnRobotPublisher_.publish(pointsOnRobot_->getVisualization(state));
+    pubPointsOnRobot_.publish(pointsOnRobot_->getVisualization(state));
 }
 
+void OmplPlanner::visualizeOccupancyGrid(const std::vector<Eigen::Matrix<float, 3, 1>> collisionPoints) {
+    int n = collisionPoints.size();
+
+
+
+    visualization_msgs::MarkerArray markerArray;
+    markerArray.markers.resize(n);
+
+
+    for (int i = 0; i < n; i++) {
+        auto& marker = markerArray.markers[i];
+        marker.type = visualization_msgs::Marker::Type::SPHERE;
+        marker.id = i;
+        marker.action = 0;
+        marker.scale.x = 0.4;
+        marker.scale.y = 0.4;
+        marker.scale.z = 0.4;
+        marker.pose.position.x = collisionPoints[i].x();
+        marker.pose.position.y = collisionPoints[i].y();
+        marker.pose.position.z = collisionPoints[i].z();
+
+        marker.pose.orientation.w = 1;
+        marker.pose.orientation.x = 0;
+        marker.pose.orientation.y = 0;
+        marker.pose.orientation.z = 0;
+
+        marker.color.a = 0.5;
+        marker.color.r = 0.0;
+        marker.color.b = 0.0;
+        marker.color.g = 0.5;
+
+        marker.frame_locked = true;
+        marker.header.frame_id = "odom";
+        marker.header.stamp = ros::Time::now();
+    }
+
+    pubPointsOnRobot_.publish(markerArray);
+
+}

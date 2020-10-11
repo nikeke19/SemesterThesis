@@ -12,6 +12,8 @@
 #include <Eigen/Dense>
 #include "kindr/poses/HomogeneousTransformation.hpp"
 #include <kindr_ros/kindr_ros.hpp>
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
 
 // Custom Classes
 #include "EndEffectorGoal.h"
@@ -52,6 +54,7 @@ struct Settings {
 
     Eigen::Vector2d minBasePositionLimit{-2.5, -2.5};
     Eigen::Vector2d maxBasePositionLimit{2.5, 2.5};
+    Eigen::Vector2d minMaxHeight{0.0, 2.5};
 
     Eigen::Matrix<double, 6, 1> minArmPositionLimits;
     Eigen::Matrix<double, 6, 1> maxArmPositionLimits;
@@ -61,10 +64,16 @@ struct Settings {
     Eigen::Matrix4d transformWrist2_X_Endeffector = Eigen::Matrix4d::Identity();
 
     double maxPlanningTime = 20;
-    double positionTolerance = 0.05; //todo was 0.1
+    double positionTolerance = 0.3;
     double orientationTolerance = 100;
 
     std::shared_ptr<VoxbloxCostConfig> voxbloxCostConfig = nullptr;
+};
+
+struct CurrentState {
+    Eigen::Vector2d position2DBase;
+    double yaw_base;
+    Eigen::Matrix<double,6,1> jointAngles;
 };
 
 
@@ -80,18 +89,6 @@ public:
     OmplPlanner() = default;
     ~OmplPlanner()= default;
 
-
-    struct CurrentState {
-        Eigen::Vector2d position2DBase;
-        double yaw_base;
-        Eigen::Matrix<double,6,1> jointAngles;
-    };
-
-    struct PlannerOutput {
-        std::vector<double> times;
-        std::vector<state_vector_t> states;
-        std::vector<input_vector_t> inputs;
-    };
 private:
     ros::NodeHandle nh_;
     ros::Subscriber subDesiredEndEffectorPoseSubscriber_;
@@ -101,7 +98,7 @@ private:
     geometry_msgs::TransformStamped odomTrans_;
     sensor_msgs::JointState jointState_;
     ros::Publisher pubArmState_;
-    ros::Publisher pointsOnRobotPublisher_;
+    ros::Publisher pubPointsOnRobot_;
     ros::Rate r_;
     std::shared_ptr<PointsOnRobot> pointsOnRobot_;
 
@@ -113,28 +110,36 @@ private:
     std::shared_ptr<KinematicsInterfaceAD> kinematicsInterface_;
 
     // Solution to planning problem
-    PlannerOutput solutionTrajectory_;
-    std::vector<CurrentState> test;
+    bool writeSolutionTrajectoryToFile_ = false;
+    bool writeConditioningToFile_ = false;
+    bool writeOccupancyGridToFile_ = true;
 
     //For Voxblox
     std::shared_ptr<voxblox::EsdfCachingServer> esdfCachingServer_;
 
+   //Initialize
     void initializeState();
     void initializeKinematicInterfaceConfig();
     void testLoop();
     void loadMap();
+    void setUpVoxbloxCostConfig();
 
     void cbDesiredEndEffectorPose(const geometry_msgs::PoseStampedConstPtr& msgPtr);
     void planTrajectory(const kindr::HomTransformQuatD& goal_pose);
-    void publishSolutionTrajectory(const std::vector<CurrentState>& solutionTrajectory);
-
     ompl::base::GoalPtr convertPoseToOmplGoal(const kindr::HomTransformQuatD& goal_pose);
-    void setUpVoxbloxCostConfig();
+
+
+
+    // Functions to save Data
+    void writeTrajectoryToFile(const std::vector<CurrentState>& trajectory, const std::string& name);
+    void writeConditioningToFile(const MabiStateSpace::StateType* goalState, CurrentState startState ,std::string name);
+    //void writeOccupancyGridToFile(const ompl::base::StateValidityCheckerPtr voxbloxStateValidityChecker, double resolution);
+    void writeOccupancyGridToFile(float resolution, const std::string name);
+
+    //Visualization
+    void publishSolutionTrajectory(const std::vector<CurrentState>& solutionTrajectory);
     void visualizeCollisionPoints(const geometry_msgs::TransformStamped& base, sensor_msgs::JointState joints);
-
-
-
-
+    void visualizeOccupancyGrid(const std::vector<Eigen::Matrix<float, 3,1>> collisionPoints);
 
 };
 

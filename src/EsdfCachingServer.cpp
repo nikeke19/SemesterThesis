@@ -55,6 +55,7 @@ void EsdfCachingServer::esdfMapCallback(const voxblox_msgs::Layer& layer_msg) {
           std::lock_guard<std::mutex> lockGuard(cacheMutex_);
           cachedCachingLayer_ = incomingEsdfCached;
       }
+      disableMeshUpdate();
   }
 
 }

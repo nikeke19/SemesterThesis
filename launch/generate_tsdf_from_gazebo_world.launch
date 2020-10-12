@@ -1,7 +1,7 @@
 <?xml version="1.0"?>
 <launch>
     <arg name="model_path" default="$(find gazebo_worlds)/.."/>
-    <arg name="world_path" default="$(find perceptive_mpc)/maps/fixed_table.world"/>
+    <arg name="world_path" default="$(find perceptive_mpc)/maps/kitchen.world"/>
     <param name="voxblox_ground_truth/voxel_size" value="0.05"/>
     <param name="gazebo/floodfill_unoccupied" value="true"/>
     <param name="gazebo/floodfill_distance" value="0.2"/>

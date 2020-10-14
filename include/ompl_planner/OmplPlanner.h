@@ -110,8 +110,8 @@ private:
     std::shared_ptr<KinematicsInterfaceAD> kinematicsInterface_;
 
     // Solution to planning problem
-    bool writeSolutionTrajectoryToFile_ = false;
-    bool writeConditioningToFile_ = false;
+    bool writeSolutionTrajectoryToFile_ = true;
+    bool writeConditioningToFile_ = true;
     bool writeOccupancyGridToFile_ = true;
 
     //For Voxblox

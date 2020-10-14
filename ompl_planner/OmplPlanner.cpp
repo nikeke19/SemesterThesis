@@ -61,7 +61,7 @@ void OmplPlanner::initializeState() {
 }
 void OmplPlanner::testLoop() {
     int i = 0;
-    while(ros::ok() == true && i < 100) {
+    while(ros::ok() == true && i < 10) {
         jointState_.header.stamp = ros::Time::now();
         odomTrans_.header.stamp = ros::Time::now();
         pubArmState_.publish(jointState_);
@@ -124,9 +124,8 @@ void OmplPlanner::initializeKinematicInterfaceConfig() {
 
 void OmplPlanner::loadMap() {
     voxblox_msgs::FilePath srv;
-//    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/example/example_map.esdf";
-//    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/maps/fixed_table2.tsdf";
-    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/maps/example_map.esdf";
+    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/maps/test.esdf";
+//    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/maps/example_map.esdf";
     serviceLoadMap_.waitForExistence();
     if (serviceLoadMap_.call(srv))
         ROS_INFO("Service load map called succesfully");
@@ -194,15 +193,13 @@ void OmplPlanner::planTrajectory(const kindr::HomTransformQuatD& goal_pose) {
 
     //Setting up the collision detection
     auto si = ss.getSpaceInformation();
-    //setUpVoxbloxCostConfig();
     esdfCachingServer_->updateInterpolator();
-    //auto voxbloxStateValidityChecker = std::make_shared<VoxbloxStateValidityChecker>(si.get(), settings_.voxbloxCostConfig);
     std::shared_ptr<VoxbloxStateValidityChecker> voxbloxStateValidityChecker = std::make_shared<VoxbloxStateValidityChecker>(si.get(), settings_.voxbloxCostConfig);
     ss.setStateValidityChecker(voxbloxStateValidityChecker);
 
     // Defining the start
     ob::ScopedState<MabiStateSpace> start(space);
-    start->basePoseState()->setXY(currentState_.position2DBase.x(), currentState_.position2DBase.y()); //todo Change to real observations
+    start->basePoseState()->setXY(currentState_.position2DBase.x(), currentState_.position2DBase.y());
     start->basePoseState()->setYaw(currentState_.yaw_base);
     for (int i = 0; i < currentState_.jointAngles.size(); i++)
         start->armState()->values[i] = currentState_.jointAngles[i];
@@ -238,7 +235,6 @@ void OmplPlanner::planTrajectory(const kindr::HomTransformQuatD& goal_pose) {
         solutionTrajectory.resize(ss.getSolutionPath().getStateCount());
         std::cout <<"state count is" << ss.getSolutionPath().getStateCount();
 
-
         int i = 0;
         for (const auto& state : ss.getSolutionPath().getStates()) {
             auto mabiSpace = state->as<MabiState>();
@@ -258,17 +254,12 @@ void OmplPlanner::planTrajectory(const kindr::HomTransformQuatD& goal_pose) {
 
         if(writeSolutionTrajectoryToFile_)
             writeTrajectoryToFile(solutionTrajectory, "test");
-
         if(writeConditioningToFile_)
             writeConditioningToFile(ss.getSolutionPath().getState(n_points-1)->as<MabiState>(), solutionTrajectory[0], "test");
-
         if(writeOccupancyGridToFile_)
             writeOccupancyGridToFile(0.1, "test");
-            //writeOccupancyGridToFile(voxbloxStateValidityChecker, 0.2);
-
 
         ROS_WARN("Achieved Output");
-
     }
     else {
         std::cout << "No solution found after" << settings_.maxPlanningTime << "s." << std::endl;
@@ -374,12 +365,12 @@ void OmplPlanner::writeOccupancyGridToFile(const float resolution, const std::st
 
 
     //Allocate Memory for 3D occupancy Grid
-    int*** occupancyGrid = new int**[n_x_points];
-    for (int i = 0; i < n_x_points; i++) {
+    int*** occupancyGrid = new int**[n_z_points];
+    for (int i = 0; i < n_z_points; i++) {
         occupancyGrid[i] = new int*[n_y_points];
 
         for (int j = 0; j < n_y_points; j++)
-            occupancyGrid[i][j] = new int[n_z_points];
+            occupancyGrid[i][j] = new int[n_x_points];
     }
 
     std::vector<Eigen::Matrix<float, 3, 1>> collisionPoints;
@@ -392,21 +383,21 @@ void OmplPlanner::writeOccupancyGridToFile(const float resolution, const std::st
 
 
     //Start to fill occupancy Grid
-    for(int i_x = 0; i_x < n_x_points; i_x++) {
+    for(int i_z = 0; i_z < n_z_points; i_z++) {
         for(int i_y = 0; i_y < n_y_points; i_y++) {
-            for(int i_z = 0; i_z < n_z_points; i_z++) {
+            for(int i_x = 0; i_x < n_x_points; i_x++) {
                 checkPoint = {float(settings_.minBasePositionLimit[0] + i_x * resolution) ,
                               float(settings_.minBasePositionLimit[1] + i_y * resolution),
                               float(settings_.minMaxHeight[0] + i_z * resolution)};
                 interpolator->getInterpolatedDistance(checkPoint, &distance);
 
                 if(distance <= resolution / 2) {
-                    occupancyGrid[i_x][i_y][i_z] = 1;
+                    occupancyGrid[i_z][i_y][i_x] = 1;
                     //z > 0 to ensure that ground is not included
                     if(checkPoint.z() > 0.01)
-                        occupancyGridFile << 1 << std::endl;
+                        occupancyGridFile << 1 << ",";
                     else
-                        occupancyGridFile << 0 << std::endl;
+                        occupancyGridFile << 0 << ",";
 
 
                     // todo Only for debug
@@ -422,11 +413,13 @@ void OmplPlanner::writeOccupancyGridToFile(const float resolution, const std::st
                     
                 }
                 else {
-                    occupancyGrid[i_x][i_y][i_z] = 0;
-                    occupancyGridFile << 0 << std::endl;
+                    occupancyGrid[i_z][i_y][i_x] = 0;
+                    occupancyGridFile << 0 << ",";
                 }
             }
+            occupancyGridFile << std::endl;
         }
+        occupancyGridFile << std::endl;
     }
 
     ROS_WARN("Finished Occupancy Grid");

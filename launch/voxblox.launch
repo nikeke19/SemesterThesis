@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <launch>
     <!-- node name="voxblox_node" pkg="voxblox_ros" type="esdf_server" output="log" args="" clear_params="true"-->
-    <node name="voxblox_node" pkg="voxblox_ros" type="tsdf_server" output="log" args="" clear_params="true">
+    <node name="voxblox_node" pkg="voxblox_ros" type="esdf_server" output="log" args="" clear_params="true">
         <remap from="pointcloud" to="/self_filtered_pointcloud"/>
         <remap from="voxblox_node/esdf_map_out" to="esdf_map" />
         <param name="publish_esdf_map" value="true" />

@@ -14,6 +14,10 @@
 #include <kindr_ros/kindr_ros.hpp>
 #include <visualization_msgs/Marker.h>
 #include <visualization_msgs/MarkerArray.h>
+#include "mabi_msgs/PlanTrajectoryAction.h"
+#include "mabi_msgs/WriteOcGrid.h"
+#include <actionlib/server/simple_action_server.h>
+
 
 // Custom Classes
 #include "EndEffectorGoal.h"
@@ -52,8 +56,8 @@ struct Settings {
         velocityLimits << 1.0, 0.5, 0.5, 0.5, 0.5, 0.7, 1.0, 1.0;
     }
 
-    Eigen::Vector2d minBasePositionLimit{-2.5, -2.5};
-    Eigen::Vector2d maxBasePositionLimit{2.5, 2.5};
+    Eigen::Vector2d minBasePositionLimit{-5.0, -5.0};
+    Eigen::Vector2d maxBasePositionLimit{5.0, 5.0};
     Eigen::Vector2d minMaxHeight{0.0, 2.5};
 
     Eigen::Matrix<double, 6, 1> minArmPositionLimits;
@@ -91,7 +95,7 @@ public:
 
 private:
     ros::NodeHandle nh_;
-    ros::Subscriber subDesiredEndEffectorPoseSubscriber_;
+
 
     // To publish to RVIZ Simulation
     tf::TransformBroadcaster tfOdomBroadcaster_;
@@ -106,16 +110,25 @@ private:
     Settings settings_;
     CurrentState currentState_;
     KinematicInterfaceConfig kinematicInterfaceConfig_;
+    std::shared_ptr<voxblox::EsdfCachingServer> esdfCachingServer_;
     ros::ServiceClient serviceLoadMap_;
     std::shared_ptr<KinematicsInterfaceAD> kinematicsInterface_;
 
     // Solution to planning problem
-    bool writeSolutionTrajectoryToFile_ = true;
-    bool writeConditioningToFile_ = true;
+    bool writeSolutionTrajectoryToFile_ = false;
+    bool writeConditioningToFile_ = false;
     bool writeOccupancyGridToFile_ = true;
 
-    //For Voxblox
-    std::shared_ptr<voxblox::EsdfCachingServer> esdfCachingServer_;
+    // For external programm requesting Trajectory
+    ros::Subscriber subDesiredEndEffectorPoseSubscriber_;
+    actionlib::SimpleActionServer<mabi_msgs::PlanTrajectoryAction> asPlanTrajectory_;
+    mabi_msgs::PlanTrajectoryResult planTrajectoryResult_;
+    ros::ServiceServer srvWriteOccupancyGridToFile_;
+
+
+    // Mutex
+    boost::shared_mutex observationMutex_;
+
 
    //Initialize
     void initializeState();
@@ -124,22 +137,25 @@ private:
     void loadMap();
     void setUpVoxbloxCostConfig();
 
-    void cbDesiredEndEffectorPose(const geometry_msgs::PoseStampedConstPtr& msgPtr);
-    void planTrajectory(const kindr::HomTransformQuatD& goal_pose);
+    bool planTrajectory(const kindr::HomTransformQuatD &goal_pose, std::string name);
     ompl::base::GoalPtr convertPoseToOmplGoal(const kindr::HomTransformQuatD& goal_pose);
-
-
 
     // Functions to save Data
     void writeTrajectoryToFile(const std::vector<CurrentState>& trajectory, const std::string& name);
     void writeConditioningToFile(const MabiStateSpace::StateType* goalState, CurrentState startState ,std::string name);
-    //void writeOccupancyGridToFile(const ompl::base::StateValidityCheckerPtr voxbloxStateValidityChecker, double resolution);
-    void writeOccupancyGridToFile(float resolution, const std::string name);
+    void writeOccupancyGridToFile(float resolution, std::string name);
 
     //Visualization
     void publishSolutionTrajectory(const std::vector<CurrentState>& solutionTrajectory);
     void visualizeCollisionPoints(const geometry_msgs::TransformStamped& base, sensor_msgs::JointState joints);
-    void visualizeOccupancyGrid(const std::vector<Eigen::Matrix<float, 3,1>> collisionPoints);
+    void visualizeOccupancyGrid(std::vector<Eigen::Matrix<float, 3,1>> collisionPoints);
+
+    // For external programms requesting Trajectory
+    void cbDesiredEndEffectorPose(const geometry_msgs::PoseStampedConstPtr& msgPtr);
+    void cbPlanTrajectory(const mabi_msgs::PlanTrajectoryGoalConstPtr &goal);
+    //void cbWriteOccupancyGridToFile()
+    bool cbWriteOccupancyGridToFile(mabi_msgs::WriteOcGridRequest &req, mabi_msgs::WriteOcGridResponse &res);
+    //bool RvizPublisher::servicePublishTrajectory (varileg_msgs::ActionEndRequest &req, varileg_msgs::ActionEndResponse &res)
 
 };
 

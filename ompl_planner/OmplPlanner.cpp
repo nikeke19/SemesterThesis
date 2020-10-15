@@ -1,14 +1,11 @@
-//
-// Created by nick on 29/09/2020.
-//
-
 #include "ompl_planner/OmplPlanner.h"
 
 using namespace perceptive_mpc;
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
 
-OmplPlanner::OmplPlanner(const ros::NodeHandle& nodeHandle) : nh_(nodeHandle), r_(100) {
+OmplPlanner::OmplPlanner(const ros::NodeHandle& nodeHandle) : nh_(nodeHandle), r_(100),
+asPlanTrajectory_(nodeHandle, "plan_trajectory", boost::bind(&OmplPlanner::cbPlanTrajectory, this, _1), false) {
     ROS_WARN("I am alive");
 
     subDesiredEndEffectorPoseSubscriber_ =
@@ -19,11 +16,12 @@ OmplPlanner::OmplPlanner(const ros::NodeHandle& nodeHandle) : nh_(nodeHandle), r
         ros::Rate(100).sleep();
     serviceLoadMap_ = nh_.serviceClient<voxblox_msgs::FilePath>("/voxblox_node/load_map");
 
-    //ros::Duration(15).sleep();
     initializeState();
     initializeKinematicInterfaceConfig();
     loadMap();
     setUpVoxbloxCostConfig();
+    asPlanTrajectory_.start();
+    srvWriteOccupancyGridToFile_ = nh_.advertiseService("write_oc_grid_to_file", &OmplPlanner::cbWriteOccupancyGridToFile, this);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -60,15 +58,13 @@ void OmplPlanner::initializeState() {
     testLoop();
 }
 void OmplPlanner::testLoop() {
-    int i = 0;
-    while(ros::ok() == true && i < 10) {
+    for(int i = 0; i < 100; i++) {
         jointState_.header.stamp = ros::Time::now();
         odomTrans_.header.stamp = ros::Time::now();
         pubArmState_.publish(jointState_);
         tfOdomBroadcaster_.sendTransform(odomTrans_);
         ros::spinOnce();
         r_.sleep();
-        i++;
     }
 }
 
@@ -89,11 +85,9 @@ void OmplPlanner::initializeKinematicInterfaceConfig() {
 
         kinematicInterfaceConfig_.transformBase_X_ArmMount = Eigen::Matrix4d::Identity();
         kinematicInterfaceConfig_.transformBase_X_ArmMount.block<3, 3>(0, 0) = quat.toRotationMatrix();
-
         kinematicInterfaceConfig_.transformBase_X_ArmMount(0, 3) = transformStamped.transform.translation.x;
         kinematicInterfaceConfig_.transformBase_X_ArmMount(1, 3) = transformStamped.transform.translation.y;
         kinematicInterfaceConfig_.transformBase_X_ArmMount(2, 3) = transformStamped.transform.translation.z;
-        //ROS_INFO_STREAM("baseToArmMount_: " << std::endl << kinematicInterfaceConfig_.transformBase_X_ArmMount);
     }
 
     {
@@ -109,11 +103,9 @@ void OmplPlanner::initializeKinematicInterfaceConfig() {
 
         kinematicInterfaceConfig_.transformToolMount_X_Endeffector = Eigen::Matrix4d::Identity();
         kinematicInterfaceConfig_.transformToolMount_X_Endeffector.block<3, 3>(0, 0) = quat.toRotationMatrix();
-
         kinematicInterfaceConfig_.transformToolMount_X_Endeffector(0, 3) = transformStamped.transform.translation.x;
         kinematicInterfaceConfig_.transformToolMount_X_Endeffector(1, 3) = transformStamped.transform.translation.y;
         kinematicInterfaceConfig_.transformToolMount_X_Endeffector(2, 3) = transformStamped.transform.translation.z;
-        //ROS_INFO_STREAM("wrist2ToEETransform_: " << std::endl << kinematicInterfaceConfig_.transformToolMount_X_Endeffector);
     }
 
     //Writing everything to settings:
@@ -124,8 +116,8 @@ void OmplPlanner::initializeKinematicInterfaceConfig() {
 
 void OmplPlanner::loadMap() {
     voxblox_msgs::FilePath srv;
-    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/maps/test.esdf";
-//    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/maps/example_map.esdf";
+//    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/maps/test.esdf";
+    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/maps/example_map.esdf";
     serviceLoadMap_.waitForExistence();
     if (serviceLoadMap_.call(srv))
         ROS_INFO("Service load map called succesfully");
@@ -133,16 +125,120 @@ void OmplPlanner::loadMap() {
         ROS_WARN("Could not load map, retry manually");
 }
 
+void OmplPlanner::setUpVoxbloxCostConfig() {
+    KinematicInterfaceConfig kinematicInterfaceConfig;
+    kinematicInterfaceConfig.transformToolMount_X_Endeffector = settings_.transformWrist2_X_Endeffector;
+    kinematicInterfaceConfig.transformBase_X_ArmMount = settings_.transformBase_X_ArmMount;
+    kinematicInterfaceConfig.baseMass = 70;
+    kinematicInterfaceConfig.baseCOM = Eigen::Vector3d::Zero();
+
+    auto kinematicInterfaceConfigPtr = std::make_shared<MabiKinematics<ad_scalar_t>>(kinematicInterfaceConfig);
+
+    ros::NodeHandle pNh("~");
+    std::shared_ptr<VoxbloxCostConfig> voxbloxCostConfig = nullptr;
+
+    if (pNh.hasParam("collision_points")) {
+        perceptive_mpc::PointsOnRobot::points_radii_t pointsAndRadii(8);
+        using pair_t = std::pair<double, double>;
+
+        XmlRpc::XmlRpcValue collisionPoints;
+        pNh.getParam("collision_points", collisionPoints);
+        if (collisionPoints.getType() != XmlRpc::XmlRpcValue::TypeArray) {
+            ROS_WARN("collision_points parameter is not of type array.");
+        }
+        for (int i = 0; i < collisionPoints.size(); i++) {
+            if (collisionPoints.getType() != XmlRpc::XmlRpcValue::TypeArray) {
+                ROS_WARN_STREAM("collision_points[" << i << "] parameter is not of type array.");
+                break;
+            }
+            for (int j = 0; j < collisionPoints[i].size(); j++) {
+                if (collisionPoints[j].getType() != XmlRpc::XmlRpcValue::TypeArray) {
+                    ROS_WARN_STREAM("collision_points[" << i << "][" << j << "] parameter is not of type array.");
+                    break;
+                }
+                if (collisionPoints[i][j].size() != 2) {
+                    ROS_WARN_STREAM("collision_points[" << i << "][" << j << "] does not have 2 elements.");
+                    break;
+                }
+                double segmentId = collisionPoints[i][j][0];
+                double radius = collisionPoints[i][j][1];
+                pointsAndRadii[i].push_back(pair_t(segmentId, radius));
+                ROS_INFO_STREAM("segment=" << i << ". relative pos on segment:" << segmentId << ". radius:" << radius);
+            }
+        }
+        perceptive_mpc::PointsOnRobotConfig config;
+        config.pointsAndRadii = pointsAndRadii;
+        using ad_type = CppAD::AD<CppAD::cg::CG<double>>;
+        config.kinematics = kinematicInterfaceConfigPtr;
+        pointsOnRobot_.reset(new perceptive_mpc::PointsOnRobot(config));
+
+        if (pointsOnRobot_->numOfPoints() > 0) {
+            voxbloxCostConfig.reset(new VoxbloxCostConfig());
+            voxbloxCostConfig->pointsOnRobot = pointsOnRobot_;
+            esdfCachingServer_.reset(new voxblox::EsdfCachingServer(ros::NodeHandle(), ros::NodeHandle("~")));
+            voxbloxCostConfig->interpolator = esdfCachingServer_->getInterpolator();
+            pointsOnRobot_->initialize("points_on_robot");
+
+        } else {
+            // if there are no points defined for collision checking, set this pointer to null to disable the visualization
+            pointsOnRobot_ = nullptr;
+        }
+    }
+    settings_.voxbloxCostConfig = voxbloxCostConfig;
+
+    // To visualize
+    geometry_msgs::TransformStamped quaternion;
+    quaternion.transform.translation.x = currentState_.position2DBase.x();
+    quaternion.transform.translation.y = currentState_.position2DBase.y();
+    quaternion.transform.translation.z = 0;
+    quaternion.transform.rotation = tf::createQuaternionMsgFromYaw(currentState_.yaw_base);
+    sensor_msgs::JointState joints;
+    joints.position.resize(6);
+    for(int i=0; i < joints.position.size(); i++)
+        joints.position[i] = currentState_.jointAngles[i];
+
+    visualizeCollisionPoints(quaternion, joints);
+}
+
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+/// External Call functions to generate trajectory
+////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
+
+void OmplPlanner::cbPlanTrajectory(const mabi_msgs::PlanTrajectoryGoalConstPtr &goal) {
+    // Setting new current state
+    currentState_.position2DBase.x() = goal->current_state.pose_base.x;
+    currentState_.position2DBase.x() = goal->current_state.pose_base.x;
+    currentState_.yaw_base = goal->current_state.pose_base.theta;
+    for(int i = 0; i < 6; i++)
+        currentState_.jointAngles[i] = goal->current_state.joint_state.position[i];
+
+    // Setting goal:
+    kindr::HomTransformQuatD goalPose;
+    kindr_ros::convertFromRosGeometryMsg(goal->goal_pose.pose, goalPose);
+
+    //Enabling writing to file
+    writeOccupancyGridToFile_ = true;
+    writeConditioningToFile_ = true;
+
+    planTrajectoryResult_.trajectory_found = planTrajectory(goalPose, goal->file_name);
+    asPlanTrajectory_.setSucceeded(planTrajectoryResult_, "Motion plan executed");
+}
+
+bool OmplPlanner::cbWriteOccupancyGridToFile(mabi_msgs::WriteOcGridRequest &req, mabi_msgs::WriteOcGridResponse &res) {
+    writeOccupancyGridToFile(req.resolution, req.name);
+    res.wrote_to_file = true;
+}
+
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// Calculating Goal
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void OmplPlanner::cbDesiredEndEffectorPose(const geometry_msgs::PoseStampedConstPtr &msgPtr) {
-    kindr::HomTransformQuatD goal_pose;
-    kindr_ros::convertFromRosGeometryMsg(msgPtr->pose, goal_pose);
+    kindr::HomTransformQuatD goalPose;
+    kindr_ros::convertFromRosGeometryMsg(msgPtr->pose, goalPose);
 
     ROS_ERROR("OMPL: Received Desired End Effector CB");
-    planTrajectory(goal_pose);
+    planTrajectory(goalPose, "test");
 }
 
 ompl::base::GoalPtr OmplPlanner::convertPoseToOmplGoal(const kindr::HomTransformQuatD& goal_pose) {
@@ -164,7 +260,7 @@ ompl::base::GoalPtr OmplPlanner::convertPoseToOmplGoal(const kindr::HomTransform
 /// Planning Trajectory
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void OmplPlanner::planTrajectory(const kindr::HomTransformQuatD& goal_pose) {
+bool OmplPlanner::planTrajectory(const kindr::HomTransformQuatD &goal_pose, std::string name) {
     ROS_ERROR("OMPL: Create State Space ");
 
     // define state space
@@ -198,12 +294,15 @@ void OmplPlanner::planTrajectory(const kindr::HomTransformQuatD& goal_pose) {
     ss.setStateValidityChecker(voxbloxStateValidityChecker);
 
     // Defining the start
-    ob::ScopedState<MabiStateSpace> start(space);
-    start->basePoseState()->setXY(currentState_.position2DBase.x(), currentState_.position2DBase.y());
-    start->basePoseState()->setYaw(currentState_.yaw_base);
-    for (int i = 0; i < currentState_.jointAngles.size(); i++)
-        start->armState()->values[i] = currentState_.jointAngles[i];
-    ss.setStartState(start);
+    {
+        boost::shared_lock<boost::shared_mutex> lock(observationMutex_);
+        ob::ScopedState<MabiStateSpace> start(space);
+        start->basePoseState()->setXY(currentState_.position2DBase.x(), currentState_.position2DBase.y());
+        start->basePoseState()->setYaw(currentState_.yaw_base);
+        for (int i = 0; i < currentState_.jointAngles.size(); i++)
+            start->armState()->values[i] = currentState_.jointAngles[i];
+        ss.setStartState(start);
+    }
 
     //Setting the goal
     auto goal = convertPoseToOmplGoal(goal_pose);
@@ -253,16 +352,18 @@ void OmplPlanner::planTrajectory(const kindr::HomTransformQuatD& goal_pose) {
         publishSolutionTrajectory(solutionTrajectory);
 
         if(writeSolutionTrajectoryToFile_)
-            writeTrajectoryToFile(solutionTrajectory, "test");
+            writeTrajectoryToFile(solutionTrajectory, name);
         if(writeConditioningToFile_)
-            writeConditioningToFile(ss.getSolutionPath().getState(n_points-1)->as<MabiState>(), solutionTrajectory[0], "test");
-        if(writeOccupancyGridToFile_)
-            writeOccupancyGridToFile(0.1, "test");
+            writeConditioningToFile(ss.getSolutionPath().getState(n_points-1)->as<MabiState>(), solutionTrajectory[0], name);
+//        if(writeOccupancyGridToFile_)
+//            writeOccupancyGridToFile(0.1, "test");
 
         ROS_WARN("Achieved Output");
+        return true;
     }
     else {
         std::cout << "No solution found after" << settings_.maxPlanningTime << "s." << std::endl;
+        return false;
     }
 }
 
@@ -353,7 +454,7 @@ void OmplPlanner::writeConditioningToFile(const MabiStateSpace::StateType* goalS
     conditionFile.close();
 }
 
-void OmplPlanner::writeOccupancyGridToFile(const float resolution, const std::string name) {
+void OmplPlanner::writeOccupancyGridToFile(float resolution, std::string name) {
     ROS_WARN("Writing Occupancy Grid");
     Eigen::Matrix<float, 3, 1> checkPoint;
     float distance;
@@ -427,95 +528,6 @@ void OmplPlanner::writeOccupancyGridToFile(const float resolution, const std::st
     visualizeOccupancyGrid(collisionPoints);
 }
 
-
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-/// Collision check
-////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-
-void OmplPlanner::setUpVoxbloxCostConfig() {
-    KinematicInterfaceConfig kinematicInterfaceConfig;
-    kinematicInterfaceConfig.transformToolMount_X_Endeffector = settings_.transformWrist2_X_Endeffector;
-    kinematicInterfaceConfig.transformBase_X_ArmMount = settings_.transformBase_X_ArmMount;
-    kinematicInterfaceConfig.baseMass = 70;
-    kinematicInterfaceConfig.baseCOM = Eigen::Vector3d::Zero();
-
-    auto kinematicInterfaceConfigPtr = std::make_shared<MabiKinematics<ad_scalar_t>>(kinematicInterfaceConfig);
-//    auto kinematicInterfaceConfigPtr = std::shared_ptr<KinematicsInterface<ad_scalar_t>>(kinematicInterfaceConfig)
-
-
-    ros::NodeHandle pNh("~");
-    std::shared_ptr<VoxbloxCostConfig> voxbloxCostConfig = nullptr;
-
-    if (pNh.hasParam("collision_points")) {
-        perceptive_mpc::PointsOnRobot::points_radii_t pointsAndRadii(8);
-        using pair_t = std::pair<double, double>;
-
-        XmlRpc::XmlRpcValue collisionPoints;
-        pNh.getParam("collision_points", collisionPoints);
-        if (collisionPoints.getType() != XmlRpc::XmlRpcValue::TypeArray) {
-            ROS_WARN("collision_points parameter is not of type array.");
-        }
-        for (int i = 0; i < collisionPoints.size(); i++) {
-            if (collisionPoints.getType() != XmlRpc::XmlRpcValue::TypeArray) {
-                ROS_WARN_STREAM("collision_points[" << i << "] parameter is not of type array.");
-                break;
-            }
-            for (int j = 0; j < collisionPoints[i].size(); j++) {
-                if (collisionPoints[j].getType() != XmlRpc::XmlRpcValue::TypeArray) {
-                    ROS_WARN_STREAM("collision_points[" << i << "][" << j << "] parameter is not of type array.");
-                    break;
-                }
-                if (collisionPoints[i][j].size() != 2) {
-                    ROS_WARN_STREAM("collision_points[" << i << "][" << j << "] does not have 2 elements.");
-                    break;
-                }
-                double segmentId = collisionPoints[i][j][0];
-                double radius = collisionPoints[i][j][1];
-                pointsAndRadii[i].push_back(pair_t(segmentId, radius));
-                ROS_INFO_STREAM("segment=" << i << ". relative pos on segment:" << segmentId << ". radius:" << radius);
-            }
-        }
-        perceptive_mpc::PointsOnRobotConfig config;
-        config.pointsAndRadii = pointsAndRadii;
-        using ad_type = CppAD::AD<CppAD::cg::CG<double>>;
-        config.kinematics = kinematicInterfaceConfigPtr; //todo commented out to try below
-//        config.kinematics = kinematicInterfaceConfig_;
-
-        //std::shared_ptr<PointsOnRobot> pointsOnRobot_;
-        pointsOnRobot_.reset(new perceptive_mpc::PointsOnRobot(config));
-
-        if (pointsOnRobot_->numOfPoints() > 0) {
-            voxbloxCostConfig.reset(new VoxbloxCostConfig());
-            voxbloxCostConfig->pointsOnRobot = pointsOnRobot_;
-
-            esdfCachingServer_.reset(new voxblox::EsdfCachingServer(ros::NodeHandle(), ros::NodeHandle("~")));
-            voxbloxCostConfig->interpolator = esdfCachingServer_->getInterpolator();
-
-            pointsOnRobot_->initialize("points_on_robot");
-
-        } else {
-            // if there are no points defined for collision checking, set this pointer to null to disable the visualization
-            pointsOnRobot_ = nullptr;
-        }
-    }
-
-    //settings_.voxbloxCostConfig.swap(voxbloxCostConfig);
-    settings_.voxbloxCostConfig = voxbloxCostConfig;
-
-    // To visualize
-    geometry_msgs::TransformStamped quaternion;
-    quaternion.transform.translation.x = currentState_.position2DBase.x();
-    quaternion.transform.translation.y = currentState_.position2DBase.y();
-    quaternion.transform.translation.z = 0;
-    quaternion.transform.rotation = tf::createQuaternionMsgFromYaw(currentState_.yaw_base);
-    sensor_msgs::JointState joints;
-    joints.position.resize(6);
-    for(int i=0; i < joints.position.size(); i++)
-        joints.position[i] = currentState_.jointAngles[i];
-
-    visualizeCollisionPoints(quaternion, joints);
-}
-
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// Visualization in RVIZ
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -538,12 +550,8 @@ void OmplPlanner::visualizeCollisionPoints(const geometry_msgs::TransformStamped
 
 void OmplPlanner::visualizeOccupancyGrid(const std::vector<Eigen::Matrix<float, 3, 1>> collisionPoints) {
     int n = collisionPoints.size();
-
-
-
     visualization_msgs::MarkerArray markerArray;
     markerArray.markers.resize(n);
-
 
     for (int i = 0; i < n; i++) {
         auto& marker = markerArray.markers[i];
@@ -571,7 +579,5 @@ void OmplPlanner::visualizeOccupancyGrid(const std::vector<Eigen::Matrix<float, 
         marker.header.frame_id = "odom";
         marker.header.stamp = ros::Time::now();
     }
-
     pubPointsOnRobot_.publish(markerArray);
-
 }

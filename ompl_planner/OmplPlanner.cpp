@@ -217,7 +217,7 @@ void OmplPlanner::cbPlanTrajectory(const mabi_msgs::PlanTrajectoryGoalConstPtr &
     kindr_ros::convertFromRosGeometryMsg(goal->goal_pose.pose, goalPose);
 
     //Enabling writing to file
-    writeOccupancyGridToFile_ = true;
+    writeSolutionTrajectoryToFile_= true;
     writeConditioningToFile_ = true;
 
     planTrajectoryResult_.trajectory_found = planTrajectory(goalPose, goal->file_name);
@@ -321,7 +321,7 @@ bool OmplPlanner::planTrajectory(const kindr::HomTransformQuatD &goal_pose, std:
 
     ob::PlannerStatus solved = ss.solve(settings_.maxPlanningTime);
 
-    if (solved) {
+    if (solved && ss.getProblemDefinition()->getSolutionDifference() < 2) {
         std::cout << "Solved:" << solved.asString() << std::endl;
 
         //Adding more points to solution trajectory
@@ -458,6 +458,7 @@ void OmplPlanner::writeOccupancyGridToFile(float resolution, std::string name) {
     ROS_WARN("Writing Occupancy Grid");
     Eigen::Matrix<float, 3, 1> checkPoint;
     float distance;
+    esdfCachingServer_->updateInterpolator();
     auto interpolator = esdfCachingServer_->getInterpolator();
 
     const int n_x_points = int((settings_.maxBasePositionLimit(0) - settings_.minBasePositionLimit(0))/resolution) + 1;

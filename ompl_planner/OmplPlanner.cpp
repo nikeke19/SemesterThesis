@@ -309,9 +309,9 @@ bool OmplPlanner::planTrajectory(const kindr::HomTransformQuatD &goal_pose, std:
     ss.setGoal(goal);
 
     // Defining the planner
-    auto planner = std::make_shared<og::RRT>(si);
-//    auto planner = std::make_shared<og::RRTstar>(si);
-    planner->setRange(0.1);
+//    auto planner = std::make_shared<og::RRT>(si);
+    auto planner = std::make_shared<og::RRTstar>(si);
+    //planner->setRange(0.1);
     planner->setGoalBias(0.5);
     ss.setPlanner(planner);
     ss.setup();
@@ -454,7 +454,7 @@ void OmplPlanner::writeConditioningToFile(const MabiStateSpace::StateType* goalS
     conditionFile.close();
 }
 
-void OmplPlanner::writeOccupancyGridToFile(float resolution, std::string name) {
+void OmplPlanner::writeOccupancyGridToFile(const float resolution, std::string name) {
     ROS_WARN("Writing Occupancy Grid");
     Eigen::Matrix<float, 3, 1> checkPoint;
     float distance;

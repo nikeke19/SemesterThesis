@@ -58,7 +58,7 @@ struct Settings {
 
     Eigen::Vector2d minBasePositionLimit{-5.0, -5.0};
     Eigen::Vector2d maxBasePositionLimit{5.0, 5.0};
-    Eigen::Vector2d minMaxHeight{0.0, 2.5};
+    Eigen::Vector2d minMaxHeight{0.0, 2.6};
 
     Eigen::Matrix<double, 6, 1> minArmPositionLimits;
     Eigen::Matrix<double, 6, 1> maxArmPositionLimits;
@@ -67,7 +67,7 @@ struct Settings {
     Eigen::Matrix4d transformBase_X_ArmMount = Eigen::Matrix4d::Identity();
     Eigen::Matrix4d transformWrist2_X_Endeffector = Eigen::Matrix4d::Identity();
 
-    double maxPlanningTime = 20;
+    double maxPlanningTime = 100;
     double positionTolerance = 0.3;
     double orientationTolerance = 100;
 
@@ -143,7 +143,7 @@ private:
     // Functions to save Data
     void writeTrajectoryToFile(const std::vector<CurrentState>& trajectory, const std::string& name);
     void writeConditioningToFile(const MabiStateSpace::StateType* goalState, CurrentState startState ,std::string name);
-    void writeOccupancyGridToFile(float resolution, std::string name);
+    void writeOccupancyGridToFile(const float resolution, std::string name);
 
     //Visualization
     void publishSolutionTrajectory(const std::vector<CurrentState>& solutionTrajectory);

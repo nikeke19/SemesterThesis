@@ -16,6 +16,7 @@ asPlanTrajectory_(nodeHandle, "plan_trajectory", boost::bind(&OmplPlanner::cbPla
         ros::Rate(100).sleep();
     serviceLoadMap_ = nh_.serviceClient<voxblox_msgs::FilePath>("/voxblox_node/load_map");
 
+//    ros::Duration(10).sleep();
     initializeState();
     initializeKinematicInterfaceConfig();
     loadMap();
@@ -30,9 +31,23 @@ asPlanTrajectory_(nodeHandle, "plan_trajectory", boost::bind(&OmplPlanner::cbPla
 
 void OmplPlanner::initializeState() {
     //Setting up own State
-    currentState_.position2DBase << 0,0;
-    currentState_.yaw_base = 0;
-    currentState_.jointAngles << 0, -PI/2, 0, 0, -PI/2, PI/4;
+    XmlRpc::XmlRpcValue startValues;
+    ros::NodeHandle pNh("~");
+
+    if(pNh.hasParam("start_position")) {
+        pNh.getParam("start_position", startValues);
+        currentState_.position2DBase << startValues[0][0], startValues[0][1];
+        currentState_.yaw_base = startValues[0][2];
+        currentState_.jointAngles << startValues[1][0], startValues[1][1], startValues[1][2], startValues[1][3],
+                                     startValues[1][4], startValues[1][5];
+    }
+
+    else {
+        ROS_WARN("Param start position not found in vcxblox.yaml. Using default values");
+        currentState_.position2DBase << 0,0;
+        currentState_.yaw_base = 0;
+        currentState_.jointAngles << 0, -PI/2, 0, 0, -PI/2, PI/4;
+    }
 
     //Setting up Transform for the base
     odomTrans_.header.frame_id = "odom";
@@ -116,8 +131,17 @@ void OmplPlanner::initializeKinematicInterfaceConfig() {
 
 void OmplPlanner::loadMap() {
     voxblox_msgs::FilePath srv;
+    ros::NodeHandle pNh("~");
+
+    if(pNh.hasParam("path_world"))
+        pNh.getParam("path_world", srv.request.file_path);
+    else {
+        ROS_WARN("Could not read map from voxblox.yaml. Using default map");
+        srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/maps/example_map.esdf";
+    }
+
 //    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/maps/test.esdf";
-    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/maps/no_floor.esdf";
+//    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/maps/no_floor.esdf";
 //    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/maps/example_map.esdf";
     serviceLoadMap_.waitForExistence();
     if (serviceLoadMap_.call(srv))

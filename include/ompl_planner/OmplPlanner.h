@@ -51,8 +51,8 @@ namespace perceptive_mpc{
 
 struct Settings {
     Settings() {
-        minArmPositionLimits << -5.23599, -3.14159, -2.47837, -5.23599, -2.04204, -3.14159;
-        maxArmPositionLimits << 5.23599, 3.14159, 2.47837, 5.23599, 2.04204, 3.14159;
+        minArmPositionLimits << -5.23599, -(PI + 0.14 * PI), -2.47837, -5.23599, -2.04204, -3.14159;
+        maxArmPositionLimits << 5.23599, 0.14 * PI, 2.47837, 5.23599, 2.04204, 3.14159;
         velocityLimits << 1.0, 0.5, 0.5, 0.5, 0.5, 0.7, 1.0, 1.0;
     }
 
@@ -67,7 +67,7 @@ struct Settings {
     Eigen::Matrix4d transformBase_X_ArmMount = Eigen::Matrix4d::Identity();
     Eigen::Matrix4d transformWrist2_X_Endeffector = Eigen::Matrix4d::Identity();
 
-    double maxPlanningTime = 100;
+    double maxPlanningTime = 20;
     double positionTolerance = 0.3;
     double orientationTolerance = 100;
 

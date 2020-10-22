@@ -117,7 +117,8 @@ void OmplPlanner::initializeKinematicInterfaceConfig() {
 void OmplPlanner::loadMap() {
     voxblox_msgs::FilePath srv;
 //    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/maps/test.esdf";
-    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/maps/example_map.esdf";
+    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/maps/no_floor.esdf";
+//    srv.request.file_path = "/home/nick/mpc_ws/src/perceptive_mpc/maps/example_map.esdf";
     serviceLoadMap_.waitForExistence();
     if (serviceLoadMap_.call(srv))
         ROS_INFO("Service load map called succesfully");
@@ -197,7 +198,7 @@ void OmplPlanner::setUpVoxbloxCostConfig() {
     for(int i=0; i < joints.position.size(); i++)
         joints.position[i] = currentState_.jointAngles[i];
 
-    visualizeCollisionPoints(quaternion, joints);
+    //visualizeCollisionPoints(quaternion, joints);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -309,8 +310,8 @@ bool OmplPlanner::planTrajectory(const kindr::HomTransformQuatD &goal_pose, std:
     ss.setGoal(goal);
 
     // Defining the planner
-//    auto planner = std::make_shared<og::RRT>(si);
-    auto planner = std::make_shared<og::RRTstar>(si);
+    auto planner = std::make_shared<og::RRT>(si);
+//    auto planner = std::make_shared<og::RRTstar>(si);
     //planner->setRange(0.1);
     planner->setGoalBias(0.5);
     ss.setPlanner(planner);
@@ -389,7 +390,7 @@ void OmplPlanner::publishSolutionTrajectory(const std::vector<CurrentState>& sol
         //publishing base transform and joint states
         pubArmState_.publish(jointState_);
         tfOdomBroadcaster_.sendTransform(odomTrans_);
-        visualizeCollisionPoints(odomTrans_, jointState_);
+        //visualizeCollisionPoints(odomTrans_, jointState_);
         ros::spinOnce();
         ros::Rate(25).sleep();
     }

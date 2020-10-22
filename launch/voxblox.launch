@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <launch>
-    <!-- node name="voxblox_node" pkg="voxblox_ros" type="esdf_server" output="log" args="" clear_params="true"-->
+    <arg name ="enable_icp" default="false" />
+
     <node name="voxblox_node" pkg="voxblox_ros" type="esdf_server" output="log" args="" clear_params="true">
         <remap from="pointcloud" to="/self_filtered_pointcloud"/>
         <remap from="voxblox_node/esdf_map_out" to="esdf_map" />
@@ -9,6 +10,7 @@
         <param name="use_tf_transforms" value="true" />
         <param name="update_mesh_every_n_sec" value="1.0" />
         <param name="clear_sphere_for_planning" value="false" />
+        <param name="enable_icp" value="$(arg enable_icp)" />
         <rosparam file="$(find perceptive_mpc)/config/voxblox.yaml"/>
     </node>
 </launch>

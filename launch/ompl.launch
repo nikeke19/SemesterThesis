@@ -16,7 +16,7 @@
         <param name="publish_frequency" value="100"/>
     </node>
 
-    <node pkg="rviz" type="rviz" name="rviz" args="-d $(arg rvizconfig)" output="screen" if="$(arg rviz)"/>
+    <node pkg="rviz" type="rviz" name="rviz" args="-d $(arg rvizconfig)" output="log" if="$(arg rviz)"/>
 
     <node name="voxblox_node" pkg="voxblox_ros" type="esdf_server" output="log" args="" clear_params="true">
         <remap from="pointcloud" to="/self_filtered_pointcloud"/>

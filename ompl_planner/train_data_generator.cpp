@@ -13,6 +13,8 @@ int main(int argc, char** argv)
     ros::NodeHandle nh;
     ros::NodeHandle pNh("~");
     XmlRpc::XmlRpcValue trajectories;
+    std::string world;
+    pNh.getParam("world", world);
 
     // Check if everything is in the right format
     if (pNh.hasParam("goal_points")) {
@@ -40,13 +42,13 @@ int main(int argc, char** argv)
     ac.waitForServer();
 
     // Making sure that map is loaded
-    ros::Duration(60).sleep();
+    //ros::Duration(30).sleep();
     ROS_INFO("Woke up from sleep");
 
     // Obtaining occupancy grid
     ros::ServiceClient client = nh.serviceClient<mabi_msgs::WriteOcGrid>("write_oc_grid_to_file");
     mabi_msgs::WriteOcGrid srv;
-    srv.request.name = "world_1";
+    srv.request.name = world;
     srv.request.resolution = 0.2;
     if(client.call(srv))
         ROS_INFO("OC Grid created succesfully");
@@ -63,10 +65,11 @@ int main(int argc, char** argv)
     int n_random_start_configurations = 10;
 
     std::default_random_engine generator;
-    std::uniform_real_distribution<double> distribution_x(-2.0, 2.0);
-    std::uniform_real_distribution<double> distribution_y(-2.0, 2.0);
+    std::uniform_real_distribution<double> distribution_x(-5.0, 5.0);
+    std::uniform_real_distribution<double> distribution_y(-5.0, 5.0);
     std::uniform_real_distribution<double> distribution_yaw(-PI, PI);
     std::uniform_real_distribution<double> distribution_q(-PI, PI);
+    std::uniform_real_distribution<double> distribution_q2(-PI * 1.14 , 0.0);
 
     int n_trajectories = trajectories.size();
     for(int i = 0; i < n_trajectories; i++) {
@@ -78,7 +81,7 @@ int main(int argc, char** argv)
         // Setting n_random_starts positions and planning to goal i
         for(int k = 0, count = 0; k < n_random_start_configurations && count < n_random_start_configurations * 3; count ++) {
             std::stringstream file_name_stream;
-            file_name_stream << "world_" << std::to_string(1) << "_goal_" << std::to_string(i) << "_start_" << std::to_string(k);
+            file_name_stream << world  << "_goal_" << std::to_string(i) << "_start_" << std::to_string(k);
             goal.file_name = file_name_stream.str();
             goal.current_state.pose_base.x = distribution_x(generator);
             goal.current_state.pose_base.y = distribution_y(generator);
@@ -86,16 +89,16 @@ int main(int argc, char** argv)
             for(int j = 0; j < 6; j++) {
                 goal.current_state.joint_state.position[j] = distribution_q(generator);
             }
+            goal.current_state.joint_state.position[1] = distribution_q2(generator);
             ac.sendGoal(goal);
             ROS_INFO("Sended goal, waiting for result");
             ac.waitForResult();
-            ROS_INFO("Got result");
             if(ac.getResult()->trajectory_found) {
                 k++;
                 ROS_INFO("Trajectory created");
             }
             else {
-                ROS_INFO("Trajectory not created");
+                ROS_WARN("Trajectory not created");
             }
 
 
@@ -103,26 +106,26 @@ int main(int argc, char** argv)
 
     }
 
-    //Setting goal
-    goal.goal_pose.pose.position.x = 0.94;
-    goal.goal_pose.pose.position.y = -0.45;
-    goal.goal_pose.pose.position.z = 0.84;
-    goal.goal_pose.pose.orientation.w = -0.7;
-    goal.goal_pose.pose.orientation.x = 0.7;
-    goal.goal_pose.pose.orientation.y = 0.0;
-    goal.goal_pose.pose.orientation.z = 0.0;
-
-    goal.file_name = "test_from_external";
-
-    for(int i = 0; i < 6; i++)
-        goal.current_state.joint_state.position[i] = 0;
-
-    goal.current_state.pose_base.x = -1;
-    goal.current_state.pose_base.y = 0;
-    goal.current_state.pose_base.theta = 0.4;
-
-    //Executing Plan
-    ac.sendGoal(goal);
+//    //Setting goal
+//    goal.goal_pose.pose.position.x = 0.94;
+//    goal.goal_pose.pose.position.y = -0.45;
+//    goal.goal_pose.pose.position.z = 0.84;
+//    goal.goal_pose.pose.orientation.w = -0.7;
+//    goal.goal_pose.pose.orientation.x = 0.7;
+//    goal.goal_pose.pose.orientation.y = 0.0;
+//    goal.goal_pose.pose.orientation.z = 0.0;
+//
+//    goal.file_name = "test_from_external";
+//
+//    for(int i = 0; i < 6; i++)
+//        goal.current_state.joint_state.position[i] = 0;
+//
+//    goal.current_state.pose_base.x = -1;
+//    goal.current_state.pose_base.y = 0;
+//    goal.current_state.pose_base.theta = 0.4;
+//
+//    //Executing Plan
+//    ac.sendGoal(goal);
     ROS_INFO("Finished data writting");
 
 }

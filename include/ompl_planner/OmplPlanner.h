@@ -18,7 +18,6 @@
 #include "mabi_msgs/WriteOcGrid.h"
 #include <actionlib/server/simple_action_server.h>
 
-
 // Custom Classes
 #include "EndEffectorGoal.h"
 #include "StateSpace.h"
@@ -67,7 +66,7 @@ struct Settings {
     Eigen::Matrix4d transformBase_X_ArmMount = Eigen::Matrix4d::Identity();
     Eigen::Matrix4d transformWrist2_X_Endeffector = Eigen::Matrix4d::Identity();
 
-    double maxPlanningTime = 20;
+    double maxPlanningTime = 100;
     double positionTolerance = 0.3;
     double orientationTolerance = 100;
 

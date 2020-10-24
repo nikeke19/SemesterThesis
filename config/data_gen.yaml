@@ -1,5 +1,7 @@
 #For definition of points look at OneNote
 
+world: world_0
+
 goal_points: [ # Red Points
              [1.77, -0.45, 0.34],
              [1.77, -0.45, 0.84],

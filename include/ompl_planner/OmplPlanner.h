@@ -66,7 +66,7 @@ struct Settings {
     Eigen::Matrix4d transformBase_X_ArmMount = Eigen::Matrix4d::Identity();
     Eigen::Matrix4d transformWrist2_X_Endeffector = Eigen::Matrix4d::Identity();
 
-    double maxPlanningTime = 100;
+    double maxPlanningTime = 150;
     double positionTolerance = 0.3;
     double orientationTolerance = 100;
 
@@ -77,6 +77,12 @@ struct CurrentState {
     Eigen::Vector2d position2DBase;
     double yaw_base;
     Eigen::Matrix<double,6,1> jointAngles;
+};
+
+enum OMPLSolution {
+    SUCCESFULL = 1,
+    UNSUCCESFUL = 0,
+    NO_VALID_START = -1
 };
 
 
@@ -136,7 +142,7 @@ private:
     void loadMap();
     void setUpVoxbloxCostConfig();
 
-    bool planTrajectory(const kindr::HomTransformQuatD &goal_pose, std::string name);
+    int planTrajectory(const kindr::HomTransformQuatD &goal_pose, std::string name);
     ompl::base::GoalPtr convertPoseToOmplGoal(const kindr::HomTransformQuatD& goal_pose);
 
     // Functions to save Data

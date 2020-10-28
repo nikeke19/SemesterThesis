@@ -4,9 +4,11 @@ using namespace perceptive_mpc;
 namespace ob = ompl::base;
 namespace og = ompl::geometric;
 
+const bool VISUALIZE_COLLISION_POINTS = false;
+
 OmplPlanner::OmplPlanner(const ros::NodeHandle& nodeHandle) : nh_(nodeHandle), r_(100),
 asPlanTrajectory_(nodeHandle, "plan_trajectory", boost::bind(&OmplPlanner::cbPlanTrajectory, this, _1), false) {
-    ROS_WARN("I am alive");
+    ROS_INFO("I am alive");
 
     subDesiredEndEffectorPoseSubscriber_ =
             nh_.subscribe("/perceptive_mpc/desired_end_effector_pose", 1, &OmplPlanner::cbDesiredEndEffectorPose, this);
@@ -222,7 +224,7 @@ void OmplPlanner::setUpVoxbloxCostConfig() {
     for(int i=0; i < joints.position.size(); i++)
         joints.position[i] = currentState_.jointAngles[i];
 
-    //visualizeCollisionPoints(quaternion, joints);
+//    visualizeCollisionPoints(quaternion, joints);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -262,7 +264,7 @@ void OmplPlanner::cbDesiredEndEffectorPose(const geometry_msgs::PoseStampedConst
     kindr::HomTransformQuatD goalPose;
     kindr_ros::convertFromRosGeometryMsg(msgPtr->pose, goalPose);
 
-    ROS_ERROR("OMPL: Received Desired End Effector CB");
+    ROS_INFO("OMPL: Received Desired End Effector CB");
     planTrajectory(goalPose, "test");
 }
 
@@ -285,9 +287,7 @@ ompl::base::GoalPtr OmplPlanner::convertPoseToOmplGoal(const kindr::HomTransform
 /// Planning Trajectory
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-bool OmplPlanner::planTrajectory(const kindr::HomTransformQuatD &goal_pose, std::string name) {
-    ROS_ERROR("OMPL: Create State Space ");
-
+int OmplPlanner::planTrajectory(const kindr::HomTransformQuatD &goal_pose, std::string name) {
     // define state space
     auto space(std::make_shared<MabiStateSpace>());
 
@@ -334,10 +334,11 @@ bool OmplPlanner::planTrajectory(const kindr::HomTransformQuatD &goal_pose, std:
     ss.setGoal(goal);
 
     // Defining the planner
-    auto planner = std::make_shared<og::RRT>(si);
-//    auto planner = std::make_shared<og::RRTstar>(si);
+//    auto planner = std::make_shared<og::RRT>(si);
+    auto planner = std::make_shared<og::RRTstar>(si);
+
     //planner->setRange(0.1);
-    planner->setGoalBias(0.5);
+    planner->setGoalBias(0.3);
     ss.setPlanner(planner);
     ss.setup();
 
@@ -346,7 +347,7 @@ bool OmplPlanner::planTrajectory(const kindr::HomTransformQuatD &goal_pose, std:
 
     ob::PlannerStatus solved = ss.solve(settings_.maxPlanningTime);
 
-    if (solved && ss.getProblemDefinition()->getSolutionDifference() < 2) {
+    if (solved && ss.getProblemDefinition()->getSolutionDifference() < 3) {
         std::cout << "Solved:" << solved.asString() << std::endl;
 
         //Adding more points to solution trajectory
@@ -383,12 +384,16 @@ bool OmplPlanner::planTrajectory(const kindr::HomTransformQuatD &goal_pose, std:
 //        if(writeOccupancyGridToFile_)
 //            writeOccupancyGridToFile(0.1, "test");
 
-        ROS_WARN("Achieved Output");
-        return true;
+        ROS_INFO("Achieved Output");
+        return OMPLSolution::SUCCESFULL;
+    }
+
+    else if(solved == ompl::base::PlannerStatus::StatusType::INVALID_START) {
+        return OMPLSolution::NO_VALID_START;
     }
     else {
         std::cout << "No solution found after" << settings_.maxPlanningTime << "s." << std::endl;
-        return false;
+        return OMPLSolution::UNSUCCESFUL;
     }
 }
 
@@ -424,7 +429,7 @@ void OmplPlanner::publishSolutionTrajectory(const std::vector<CurrentState>& sol
 /// Write Data to file
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void OmplPlanner::writeTrajectoryToFile(const std::vector<CurrentState>& trajectory, const std::string& name) {
-    ROS_ERROR("Writing trajectory to file");
+    ROS_INFO("Writing trajectory to file");
 
     std::ofstream trajectoryFile;
     trajectoryFile.open("/home/nick/Data/Table/" + name + "_trajectory.txt");
@@ -448,7 +453,7 @@ void OmplPlanner::writeTrajectoryToFile(const std::vector<CurrentState>& traject
         trajectoryFile << std::endl;
     }
     trajectoryFile.close();
-    ROS_ERROR("Writing finished");
+    ROS_INFO("Writing finished");
 }
 
 void OmplPlanner::writeConditioningToFile(const MabiStateSpace::StateType* goalState, CurrentState startState ,std::string name) {
@@ -468,11 +473,18 @@ void OmplPlanner::writeConditioningToFile(const MabiStateSpace::StateType* goalS
     conditionFile.open("/home/nick/Data/Table/" + name + "_condition.txt");
 
     //Filling header
-    conditionFile << "Start_x" << "," << "Start_y" << "," << "Start_yaw" << "," << "Goal_x" << "," << "Goal_y" << ","
-                  << "Goal_z" << "," << "Goal_q_w" << "," << "Goal_q_x" << "," << "Goal_q_y" << "," << "Goal_q_z" << std::endl;
+    conditionFile << "Start_x" << "," << "Start_y" << "," << "Start_yaw" << ","
+                  << "Start_q1" << "," << "Start_q2"  << "," << "Start_q3"  << ","
+                  << "Start_q4" << "," << "Start_q5"  << "," << "Start_q6"  << ","
+                  << "Goal_x" << "," << "Goal_y" << "," << "Goal_z" << ","
+                  << "Goal_q_w" << "," << "Goal_q_x" << "," << "Goal_q_y" << "," << "Goal_q_z" << std::endl;
     //Putting content in
-    conditionFile << startState.position2DBase.x() << "," << startState.position2DBase.y() << "," << startState.yaw_base
-                  << "," << goalEndeffectorPosition.x() << "," << goalEndeffectorPosition.y() << ","
+    conditionFile << startState.position2DBase.x() << "," << startState.position2DBase.y() << ","
+                  << startState.yaw_base << ","
+                  << startState.jointAngles[0] << "," << startState.jointAngles[1] << ","
+                  << startState.jointAngles[2] << "," << startState.jointAngles[3] << ","
+                  << startState.jointAngles[2] << "," << startState.jointAngles[3] << ","
+                  << goalEndeffectorPosition.x() << "," << goalEndeffectorPosition.y() << ","
                   << goalEndeffectorPosition.z() << "," << goalEndeffectorRotation.w() << ","
                   << goalEndeffectorRotation.x() << "," << goalEndeffectorRotation.y() << ","
                   << goalEndeffectorRotation.z() << std::endl;
@@ -480,7 +492,7 @@ void OmplPlanner::writeConditioningToFile(const MabiStateSpace::StateType* goalS
 }
 
 void OmplPlanner::writeOccupancyGridToFile(const float resolution, std::string name) {
-    ROS_WARN("Writing Occupancy Grid");
+    ROS_INFO("Writing Occupancy Grid");
     Eigen::Matrix<float, 3, 1> checkPoint;
     float distance;
     esdfCachingServer_->updateInterpolator();
@@ -504,11 +516,6 @@ void OmplPlanner::writeOccupancyGridToFile(const float resolution, std::string n
     std::ofstream occupancyGridFile;
     occupancyGridFile.open("/home/nick/Data/Table/" + name + "_occupancy_grid.txt");
 
-    //Filling header
-    //occupancyGridFile << "Start_x" << "," << "Start_y" << "," << "Start_z" << std::endl;
-    occupancyGridFile << "Grid_Points" << std::endl;
-
-
     //Start to fill occupancy Grid
     for(int i_z = 0; i_z < n_z_points; i_z++) {
         for(int i_y = 0; i_y < n_y_points; i_y++) {
@@ -520,24 +527,9 @@ void OmplPlanner::writeOccupancyGridToFile(const float resolution, std::string n
 
                 if(distance <= resolution / 2) {
                     occupancyGrid[i_z][i_y][i_x] = 1;
-                    //z > 0 to ensure that ground is not included
-                    if(checkPoint.z() > 0.01)
-                        occupancyGridFile << 1 << ",";
-                    else
-                        occupancyGridFile << 0 << ",";
-
-
-                    // todo Only for debug
-                    if(checkPoint.z() > 0.01
-                       && checkPoint.x() < 2
-                       && checkPoint.x() > -2
-                       && checkPoint.y() < 2
-                       && checkPoint.y() > -2) {
-                        //occupancyGridFile << checkPoint.x() << "," << checkPoint.y() << "," << checkPoint.z() << std::endl;
+                    occupancyGridFile << 1 << ",";
+                    if(VISUALIZE_COLLISION_POINTS)
                         collisionPoints.insert(collisionPoints.end(), checkPoint);
-                        //std::cout << checkPoint << std::endl << std::endl;
-                    }
-                    
                 }
                 else {
                     occupancyGrid[i_z][i_y][i_x] = 0;
@@ -549,9 +541,10 @@ void OmplPlanner::writeOccupancyGridToFile(const float resolution, std::string n
         occupancyGridFile << std::endl;
     }
 
-    ROS_WARN("Finished Occupancy Grid");
+    ROS_INFO("Finished Occupancy Grid");
     occupancyGridFile.close();
-    visualizeOccupancyGrid(collisionPoints);
+    if(VISUALIZE_COLLISION_POINTS)
+        visualizeOccupancyGrid(collisionPoints);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////

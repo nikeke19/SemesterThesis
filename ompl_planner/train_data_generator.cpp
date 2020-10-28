@@ -5,6 +5,9 @@
 #include <random>
 
 const double PI = 3.14156;
+const int SUCCESFULL = 1;
+const int UNSUCCESFUL = 0;
+const int NO_VALID_START = -1;
 
 int main(int argc, char** argv)
 {
@@ -65,11 +68,17 @@ int main(int argc, char** argv)
     int n_random_start_configurations = 10;
 
     std::default_random_engine generator;
+    std::normal_distribution<double> distribution_q1(0, PI/3);
+    std::normal_distribution<double> distribution_q2(-PI/2, 0.356);
+    std::normal_distribution<double> distribution_q3_1(PI/2, 0.2);
+    std::normal_distribution<double> distribution_q3_2(-PI/2, 0.2);
+    std::normal_distribution<double> distribution_q4(0, PI/3);
+    std::normal_distribution<double> distribution_q5(0, 0.66);
+    std::normal_distribution<double> distribution_q6(0, PI/3);
+    std::normal_distribution<double> distribution_position(0, 0.1);
     std::uniform_real_distribution<double> distribution_x(-5.0, 5.0);
     std::uniform_real_distribution<double> distribution_y(-5.0, 5.0);
     std::uniform_real_distribution<double> distribution_yaw(-PI, PI);
-    std::uniform_real_distribution<double> distribution_q(-PI, PI);
-    std::uniform_real_distribution<double> distribution_q2(-PI * 1.14 , 0.0);
 
     int n_trajectories = trajectories.size();
     for(int i = 0; i < n_trajectories; i++) {
@@ -79,29 +88,38 @@ int main(int argc, char** argv)
         goal.goal_pose.pose.position.z = trajectories[i][2];
 
         // Setting n_random_starts positions and planning to goal i
-        for(int k = 0, count = 0; k < n_random_start_configurations && count < n_random_start_configurations * 3; count ++) {
+        for(int k = 0, count = 0; k < n_random_start_configurations && count < n_random_start_configurations * 2; count ++) {
             std::stringstream file_name_stream;
             file_name_stream << world  << "_goal_" << std::to_string(i) << "_start_" << std::to_string(k);
             goal.file_name = file_name_stream.str();
             goal.current_state.pose_base.x = distribution_x(generator);
             goal.current_state.pose_base.y = distribution_y(generator);
             goal.current_state.pose_base.theta = distribution_yaw(generator);
-            for(int j = 0; j < 6; j++) {
-                goal.current_state.joint_state.position[j] = distribution_q(generator);
-            }
+
+            goal.current_state.joint_state.position[0] = distribution_q1(generator);
             goal.current_state.joint_state.position[1] = distribution_q2(generator);
+            // Flip coin if use gaussian centered around +PI/2 or -PI/2
+            if(rand() % 2 + 1 == 1)
+                goal.current_state.joint_state.position[2] = distribution_q3_1(generator);
+            else
+                goal.current_state.joint_state.position[2] = distribution_q3_2(generator);
+            goal.current_state.joint_state.position[3] = distribution_q4(generator);
+            goal.current_state.joint_state.position[4] = distribution_q5(generator);
+            goal.current_state.joint_state.position[5] = distribution_q6(generator);
+
             ac.sendGoal(goal);
-            ROS_INFO("Sended goal, waiting for result");
             ac.waitForResult();
-            if(ac.getResult()->trajectory_found) {
+            if(ac.getResult()->trajectory_found == SUCCESFULL) {
                 k++;
                 ROS_INFO("Trajectory created");
+            }
+            else if(ac.getResult()->trajectory_found == NO_VALID_START) {
+                ROS_WARN("No valid start");
+                count --;
             }
             else {
                 ROS_WARN("Trajectory not created");
             }
-
-
         }
 
     }

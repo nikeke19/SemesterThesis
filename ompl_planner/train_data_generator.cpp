@@ -29,7 +29,7 @@ int main(int argc, char** argv)
         else {
             for(int i = 0; i < trajectories.size(); i++) {
                 if(trajectories[i].size() != 3) {
-                    ROS_ERROR_STREAM("Wrong amount of coordinates. 3 were expected and given are" << trajectories.size());
+                    ROS_ERROR_STREAM("Wrong amount of coordinates. 3 were expected and given are" << trajectories[i].size());
                     ROS_ERROR_STREAM("Check " << i <<"th line of your data_gen.yaml file");
                     return 0;
                 }
@@ -76,12 +76,12 @@ int main(int argc, char** argv)
     std::normal_distribution<double> distribution_q5(0, 0.66);
     std::normal_distribution<double> distribution_q6(0, PI/3);
     std::normal_distribution<double> distribution_position(0, 0.1);
-    std::uniform_real_distribution<double> distribution_x(-5.0, 5.0);
+    std::uniform_real_distribution<double> distribution_x(-5, 5.0); // only for world 1, else -5,5
     std::uniform_real_distribution<double> distribution_y(-5.0, 5.0);
     std::uniform_real_distribution<double> distribution_yaw(-PI, PI);
 
     int n_trajectories = trajectories.size();
-    for(int i = 0; i < n_trajectories; i++) {
+    for(int i = 0; i < n_trajectories; i++) { //todo was zero but changed to 13
         //Setting goal
         goal.goal_pose.pose.position.x = trajectories[i][0];
         goal.goal_pose.pose.position.y = trajectories[i][1];

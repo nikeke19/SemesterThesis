@@ -347,7 +347,7 @@ int OmplPlanner::planTrajectory(const kindr::HomTransformQuatD &goal_pose, std::
 
     ob::PlannerStatus solved = ss.solve(settings_.maxPlanningTime);
 
-    if (solved && ss.getProblemDefinition()->getSolutionDifference() < 3) {
+    if (solved /*&& ss.getProblemDefinition()->getSolutionDifference() < 3*/) {
         std::cout << "Solved:" << solved.asString() << std::endl;
 
         //Adding more points to solution trajectory

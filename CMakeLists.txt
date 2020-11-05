@@ -3,7 +3,7 @@ project(perceptive_mpc)
 
 add_compile_options(-std=c++14)
 # Added by Nick
-set(CMAKE_BUILD_TYPE Debug)
+#set(CMAKE_BUILD_TYPE Debug)
 
 set(PACKAGE_DEPENDENCIES
     roslib

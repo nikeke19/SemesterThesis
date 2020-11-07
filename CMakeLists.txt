@@ -92,7 +92,7 @@ add_library(${PROJECT_NAME}
   #Added by Nick
   ompl_planner/VoxbloxStateValidityChecker.cpp
   ompl_planner/EndEffectorGoal.cpp
-)
+        )
 add_dependencies(${PROJECT_NAME}
         ${${PROJECT_NAME}_EXPORTED_TARGETS}
         ${catkin_EXPORTED_TARGETS})
@@ -141,6 +141,23 @@ add_dependencies(${PROJECT_NAME}_ompl_planner
         ${${PROJECT_NAME}_EXPORTED_TARGETS}
         ${catkin_EXPORTED_TARGETS})
 target_link_libraries(${PROJECT_NAME}_ompl_planner
+        ${PROJECT_NAME}
+        ${PROJECT_NAME}_explicit_instantiations
+        ${PROJECT_NAME}_example
+        ${catkin_LIBRARIES}
+        ${Boost_LIBRARIES}
+        ${OMPL_LIBRARIES}
+        dl)
+
+# @Nick added own node
+add_executable(${PROJECT_NAME}_write_oc_grid
+        ompl_planner/write_oc_grid_node.cpp
+        ompl_planner/WriteOcGrid.cpp
+        )
+add_dependencies(${PROJECT_NAME}_write_oc_grid
+        ${${PROJECT_NAME}_EXPORTED_TARGETS}
+        ${catkin_EXPORTED_TARGETS})
+target_link_libraries(${PROJECT_NAME}_write_oc_grid
         ${PROJECT_NAME}
         ${PROJECT_NAME}_explicit_instantiations
         ${PROJECT_NAME}_example

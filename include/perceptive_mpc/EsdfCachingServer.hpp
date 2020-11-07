@@ -42,6 +42,7 @@ class EsdfCachingServer : virtual public EsdfServer {
   void updateInterpolator();
   void disableMeshUpdate();
   void enableMeshUpdate();
+  bool getMeshUpdateState();
 
  private:
   using esdf_caching_layer_ptr = std::shared_ptr<voxblox::Layer<voxblox::EsdfCachingVoxel>>;

@@ -84,4 +84,8 @@ void EsdfCachingServer::enableMeshUpdate() {
     meshUpdate_ = true;
 }
 
+bool EsdfCachingServer::getMeshUpdateState() {
+    return meshUpdate_;
+}
+
 } /* namespace voxblox */

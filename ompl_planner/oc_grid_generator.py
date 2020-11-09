@@ -53,8 +53,8 @@ def rewrite_oc_grids():
         if old_world != world:
             old_world = world
             if load_new_map("/home/nick/mpc_ws/src/perceptive_mpc/maps/esdfs/world_" + str(world) + ".esdf"):
-                print("Going 30s to sleep while loading map")
-                rospy.sleep(30)
+                print("Going 40s to sleep while loading map")
+                rospy.sleep(40)
                 print("Woke up from sleep")
             else:
                 print("Error, Map can't be loaded!", " world_", str(world), "_goal_", str(goal), "_start_", str(start))
@@ -84,8 +84,9 @@ def find_center(name):
 
 if __name__ == '__main__':
     rospy.init_node('target_pose_publisher', anonymous=True)
-    # set_up_file_list(n_goals=70, n_starts=11, worlds_array=[0, 1, 2, 3])
-    set_up_file_list(n_goals=1, n_starts=2, worlds_array=[0, 1])
+    set_up_file_list(n_goals=70, n_starts=11, worlds_array=[3])
+    # set_up_file_list(n_goals=1, n_starts=5, worlds_array=[0, 1, 2, 3])
+    # set_up_file_list(n_goals=1, n_starts=5, worlds_array=[3])
     rewrite_oc_grids()
     print("Finished writing data")
     rospy.spin()

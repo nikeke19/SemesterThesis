@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <launch>
     <node pkg="perceptive_mpc" name="data_generator" type="perceptive_mpc_data_generator" output="screen"> <!-- launch-prefix="gdb -ex run &#45;&#45;args"-->
-        <rosparam file="$(find perceptive_mpc)/config/interesting_points/world_3.yaml"/>
+        <rosparam file="$(find perceptive_mpc)/config/interesting_points/world_6.yaml"/>
     </node>
 </launch>

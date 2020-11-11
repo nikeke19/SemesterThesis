@@ -246,13 +246,14 @@ void OmplPlanner::cbPlanTrajectory(const mabi_msgs::PlanTrajectoryGoalConstPtr &
     //Enabling writing to file
     writeSolutionTrajectoryToFile_= true;
     writeConditioningToFile_ = true;
+    writeOccupancyGridToFile_ = true;
 
     planTrajectoryResult_.trajectory_found = planTrajectory(goalPose, goal->file_name);
     asPlanTrajectory_.setSucceeded(planTrajectoryResult_, "Motion plan executed");
 }
 
 bool OmplPlanner::cbWriteOccupancyGridToFile(mabi_msgs::WriteOcGridRequest &req, mabi_msgs::WriteOcGridResponse &res) {
-    writeOccupancyGridToFile(req.resolution, req.name);
+    writeOccupancyGridToFile(req.resolution, req.name, Eigen::Vector2d(0.0, 0.0));
     res.wrote_to_file = true;
 }
 
@@ -377,12 +378,17 @@ int OmplPlanner::planTrajectory(const kindr::HomTransformQuatD &goal_pose, std::
 
         publishSolutionTrajectory(solutionTrajectory);
 
-        if(writeSolutionTrajectoryToFile_)
-            writeTrajectoryToFile(solutionTrajectory, name);
+        Eigen::Vector2d center;
         if(writeConditioningToFile_)
-            writeConditioningToFile(ss.getSolutionPath().getState(n_points-1)->as<MabiState>(), solutionTrajectory[0], name);
-//        if(writeOccupancyGridToFile_)
-//            writeOccupancyGridToFile(0.1, "test");
+            center
+              = writeConditioningToFile(ss.getSolutionPath().getState(n_points - 1)->as<MabiState>(),
+                                        solutionTrajectory[0], name, true);
+
+        if(writeSolutionTrajectoryToFile_)
+            writeTrajectoryToFile(solutionTrajectory, name, center);
+
+        if(writeOccupancyGridToFile_)
+            writeOccupancyGridToFile(0.2, name, center);
 
         ROS_INFO("Achieved Output");
         return OMPLSolution::SUCCESFULL;
@@ -428,11 +434,12 @@ void OmplPlanner::publishSolutionTrajectory(const std::vector<CurrentState>& sol
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 /// Write Data to file
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-void OmplPlanner::writeTrajectoryToFile(const std::vector<CurrentState>& trajectory, const std::string& name) {
+void OmplPlanner::writeTrajectoryToFile(const std::vector<CurrentState> &trajectory, const std::string &name,
+                                        const Eigen::Vector2d& center) {
     ROS_INFO("Writing trajectory to file");
 
     std::ofstream trajectoryFile;
-    trajectoryFile.open("/home/nick/Data/Table/" + name + "_trajectory.txt");
+    trajectoryFile.open("/home/nick/Data/Table/" + name + "_trajectory.csv");
 
     //Filling header of trajectory file:
     trajectoryFile << "Position_x" << "," << "Position_y" << "," << "Yaw";
@@ -444,8 +451,8 @@ void OmplPlanner::writeTrajectoryToFile(const std::vector<CurrentState>& traject
 
     //Filling trajectory file
     for (int i = 1; i < n; i++) {
-        trajectoryFile << trajectory[i].position2DBase.x() << ","
-                        << trajectory[i].position2DBase.y() << ","
+        trajectoryFile << trajectory[i].position2DBase.x() - center(0) << ","
+                        << trajectory[i].position2DBase.y() - center(1) << ","
                         << trajectory[i].yaw_base;
         for (int k = 0; k < 6; k++)
             trajectoryFile << "," << trajectory[i].jointAngles[k];
@@ -456,7 +463,8 @@ void OmplPlanner::writeTrajectoryToFile(const std::vector<CurrentState>& traject
     ROS_INFO("Writing finished");
 }
 
-void OmplPlanner::writeConditioningToFile(const MabiStateSpace::StateType* goalState, CurrentState startState ,std::string name) {
+Eigen::Vector2d OmplPlanner::writeConditioningToFile(const MabiStateSpace::StateType *goalState,
+                                                     CurrentState startState, const std::string& name, bool center_trajectory) {
     // Obtaining position and orientation of the Endeffector in the Goal State
     Eigen::VectorXd goalMpcState;
     Eigen::Matrix<double, 4, 4> goalEndeffectorTransform;
@@ -468,9 +476,18 @@ void OmplPlanner::writeConditioningToFile(const MabiStateSpace::StateType* goalS
     Eigen::Quaterniond goalEndeffectorRotation(goalEndeffectorTransform.block<3,3>(0, 0));
     goalEndeffectorPosition = goalEndeffectorTransform.block<3,1>(0,3);
 
+    Eigen::Vector2d center;
+    if(center_trajectory) {
+        center << (startState.position2DBase.x() + goalEndeffectorPosition.x()) / 2,
+                  (startState.position2DBase.y() + goalEndeffectorPosition.y()) / 2;
+    }
+    else {
+        center << 0.0, 0.0;
+    }
+
     //Opening file
     std::ofstream conditionFile;
-    conditionFile.open("/home/nick/Data/Table/" + name + "_condition.txt");
+    conditionFile.open("/home/nick/Data/Table/" + name + "_condition.csv");
 
     //Filling header
     conditionFile << "Start_x" << "," << "Start_y" << "," << "Start_yaw" << ","
@@ -479,19 +496,24 @@ void OmplPlanner::writeConditioningToFile(const MabiStateSpace::StateType* goalS
                   << "Goal_x" << "," << "Goal_y" << "," << "Goal_z" << ","
                   << "Goal_q_w" << "," << "Goal_q_x" << "," << "Goal_q_y" << "," << "Goal_q_z" << std::endl;
     //Putting content in
-    conditionFile << startState.position2DBase.x() << "," << startState.position2DBase.y() << ","
+    conditionFile << startState.position2DBase.x() - center(0) << ","
+                  << startState.position2DBase.y() - center(0) << ","
                   << startState.yaw_base << ","
                   << startState.jointAngles[0] << "," << startState.jointAngles[1] << ","
                   << startState.jointAngles[2] << "," << startState.jointAngles[3] << ","
                   << startState.jointAngles[2] << "," << startState.jointAngles[3] << ","
-                  << goalEndeffectorPosition.x() << "," << goalEndeffectorPosition.y() << ","
+                  << goalEndeffectorPosition.x() - center(0) << ","
+                  << goalEndeffectorPosition.y() - center(1) << ","
                   << goalEndeffectorPosition.z() << "," << goalEndeffectorRotation.w() << ","
                   << goalEndeffectorRotation.x() << "," << goalEndeffectorRotation.y() << ","
                   << goalEndeffectorRotation.z() << std::endl;
     conditionFile.close();
+
+    return center;
 }
 
-void OmplPlanner::writeOccupancyGridToFile(const float resolution, std::string name) {
+void
+OmplPlanner::writeOccupancyGridToFile(const float resolution, const std::string &name, const Eigen::Vector2d& center) {
     ROS_INFO("Writing Occupancy Grid");
     Eigen::Matrix<float, 3, 1> checkPoint;
     float distance;
@@ -514,14 +536,14 @@ void OmplPlanner::writeOccupancyGridToFile(const float resolution, std::string n
 
     std::vector<Eigen::Matrix<float, 3, 1>> collisionPoints;
     std::ofstream occupancyGridFile;
-    occupancyGridFile.open("/home/nick/Data/Table/" + name + "_occupancy_grid.txt");
+    occupancyGridFile.open("/home/nick/Data/Table/" + name + "_occupancy_grid.csv");
 
     //Start to fill occupancy Grid
     for(int i_z = 0; i_z < n_z_points; i_z++) {
         for(int i_y = 0; i_y < n_y_points; i_y++) {
             for(int i_x = 0; i_x < n_x_points; i_x++) {
-                checkPoint = {float(settings_.minBasePositionLimit[0] + i_x * resolution) ,
-                              float(settings_.minBasePositionLimit[1] + i_y * resolution),
+                checkPoint = {float(settings_.minBasePositionLimit[0] + i_x * resolution + center(0)) ,
+                              float(settings_.minBasePositionLimit[1] + i_y * resolution + center(1)),
                               float(settings_.minMaxHeight[0] + i_z * resolution)};
                 interpolator->getInterpolatedDistance(checkPoint, &distance);
 

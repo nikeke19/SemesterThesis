@@ -49,14 +49,14 @@ int main(int argc, char** argv)
     ROS_INFO("Woke up from sleep");
 
     // Obtaining occupancy grid
-    ros::ServiceClient client = nh.serviceClient<mabi_msgs::WriteOcGrid>("write_oc_grid_to_file");
-    mabi_msgs::WriteOcGrid srv;
-    srv.request.name = world;
-    srv.request.resolution = 0.2;
-    if(client.call(srv))
-        ROS_INFO("OC Grid created succesfully");
-    else
-        ROS_INFO("OC Grid not created, try again");
+//    ros::ServiceClient client = nh.serviceClient<mabi_msgs::WriteOcGrid>("write_oc_grid_to_file");
+//    mabi_msgs::WriteOcGrid srv;
+//    srv.request.name = world;
+//    srv.request.resolution = 0.2;
+//    if(client.call(srv))
+//        ROS_INFO("OC Grid created succesfully");
+//    else
+//        ROS_INFO("OC Grid not created, try again");
 
     // Default values
     mabi_msgs::PlanTrajectoryGoal goal;

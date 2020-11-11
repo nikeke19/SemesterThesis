@@ -66,7 +66,7 @@ struct Settings {
     Eigen::Matrix4d transformBase_X_ArmMount = Eigen::Matrix4d::Identity();
     Eigen::Matrix4d transformWrist2_X_Endeffector = Eigen::Matrix4d::Identity();
 
-    double maxPlanningTime = 20;
+    double maxPlanningTime = 150;
     double positionTolerance = 0.3;
     double orientationTolerance = 100;
 
@@ -122,7 +122,7 @@ private:
     // Solution to planning problem
     bool writeSolutionTrajectoryToFile_ = false;
     bool writeConditioningToFile_ = false;
-    bool writeOccupancyGridToFile_ = true;
+    bool writeOccupancyGridToFile_ = false;
 
     // For external programm requesting Trajectory
     ros::Subscriber subDesiredEndEffectorPoseSubscriber_;
@@ -146,9 +146,11 @@ private:
     ompl::base::GoalPtr convertPoseToOmplGoal(const kindr::HomTransformQuatD& goal_pose);
 
     // Functions to save Data
-    void writeTrajectoryToFile(const std::vector<CurrentState>& trajectory, const std::string& name);
-    void writeConditioningToFile(const MabiStateSpace::StateType* goalState, CurrentState startState ,std::string name);
-    void writeOccupancyGridToFile(const float resolution, std::string name);
+    void writeTrajectoryToFile(const std::vector<CurrentState> &trajectory, const std::string &name,
+                               const Eigen::Vector2d& center);
+    Eigen::Vector2d writeConditioningToFile(const MabiStateSpace::StateType *goalState, CurrentState startState,
+                                            const std::string& name, bool center_trajectory=false);
+    void writeOccupancyGridToFile(const float resolution, const std::string &name, const Eigen::Vector2d& center);
 
     //Visualization
     void publishSolutionTrajectory(const std::vector<CurrentState>& solutionTrajectory);

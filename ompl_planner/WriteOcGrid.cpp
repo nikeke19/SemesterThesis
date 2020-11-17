@@ -65,13 +65,21 @@ void WriteOcGrid::writeOccupancyGridToFile(const float resolution, std::string n
 
 
     //Allocate Memory for 3D occupancy Grid
-    int ***occupancyGrid = new int **[n_z_points];
-    for (int i = 0; i < n_z_points; i++) {
-        occupancyGrid[i] = new int *[n_y_points];
+//    int ***occupancyGrid = new int **[n_z_points];
+//    for (int i = 0; i < n_z_points; i++) {
+//        occupancyGrid[i] = new int *[n_y_points];
+//
+//        for (int j = 0; j < n_y_points; j++)
+//            occupancyGrid[i][j] = new int[n_x_points];
+//    }
 
-        for (int j = 0; j < n_y_points; j++)
-            occupancyGrid[i][j] = new int[n_x_points];
-    }
+    // Writing center to file
+    std::ofstream centerFile;
+    std::string file_center = std::string("/home/nick/Data/Table/world_") + name[6] + std::string("_center.csv");
+    centerFile.open(file_center, std::ios_base::app);
+    centerFile << std::endl;
+    centerFile << name << ","  << center(0) << "," << center(1);
+    centerFile.close();
 
     std::vector<Eigen::Matrix<float, 3, 1>> collisionPoints;
     std::ofstream occupancyGridFile;
@@ -85,14 +93,16 @@ void WriteOcGrid::writeOccupancyGridToFile(const float resolution, std::string n
             for (int i_x = 0; i_x < n_x_points; i_x++) {
                 checkPoint = {float(settings.minBasePositionLimit[0] + i_x * resolution + center[0]),
                               float(settings.minBasePositionLimit[1] + i_y * resolution + center[1]),
-                              float(settings.minMaxHeight[0] + i_z * resolution)};
+                              float(0.01 + i_z * resolution)};
                 interpolator->getInterpolatedDistance(checkPoint, &distance);
 
-                if (distance <= resolution / 2) {
-                    occupancyGrid[i_z][i_y][i_x] = 1;
+                if (distance <= resolution / 2
+                    && checkPoint.x() < 5.1 && checkPoint.x() > -4.1        //Voxblox is weird outside map [-5,5]
+                    && checkPoint.y() < 5.1 && checkPoint.y() > -3.7) {
+//                    occupancyGrid[i_z][i_y][i_x] = 1;
                     occupancyGridFile << 1 << ",";
                 } else {
-                    occupancyGrid[i_z][i_y][i_x] = 0;
+//                    occupancyGrid[i_z][i_y][i_x] = 0;
                     occupancyGridFile << 0 << ",";
                 }
             }

@@ -6,15 +6,18 @@ namespace og = ompl::geometric;
 
 const bool VISUALIZE_COLLISION_POINTS = false;
 
-OmplPlanner::OmplPlanner(const ros::NodeHandle& nodeHandle) : nh_(nodeHandle), r_(100),
-asPlanTrajectory_(nodeHandle, "plan_trajectory", boost::bind(&OmplPlanner::cbPlanTrajectory, this, _1), false) {
+OmplPlanner::OmplPlanner(const ros::NodeHandle &nodeHandle) : nh_(nodeHandle), r_(100),
+                                                              asPlanTrajectory_(nodeHandle, "plan_trajectory",
+                                                                                boost::bind(
+                                                                                        &OmplPlanner::cbPlanTrajectory,
+                                                                                        this, _1), false) {
     ROS_INFO("I am alive");
 
     subDesiredEndEffectorPoseSubscriber_ =
             nh_.subscribe("/perceptive_mpc/desired_end_effector_pose", 1, &OmplPlanner::cbDesiredEndEffectorPose, this);
     pubArmState_ = nh_.advertise<sensor_msgs::JointState>("/joint_states", 10);
     pubPointsOnRobot_ = nh_.advertise<visualization_msgs::MarkerArray>("/perceptive_mpc/collision_points", 1, false);
-    while(ros::ok() && pubArmState_.getNumSubscribers() == 0)
+    while (ros::ok() && pubArmState_.getNumSubscribers() == 0)
         ros::Rate(100).sleep();
     serviceLoadMap_ = nh_.serviceClient<voxblox_msgs::FilePath>("/voxblox_node/load_map");
 
@@ -24,7 +27,8 @@ asPlanTrajectory_(nodeHandle, "plan_trajectory", boost::bind(&OmplPlanner::cbPla
     loadMap();
     setUpVoxbloxCostConfig();
     asPlanTrajectory_.start();
-    srvWriteOccupancyGridToFile_ = nh_.advertiseService("write_oc_grid_to_file", &OmplPlanner::cbWriteOccupancyGridToFile, this);
+    srvWriteOccupancyGridToFile_ = nh_.advertiseService("write_oc_grid_to_file",
+                                                        &OmplPlanner::cbWriteOccupancyGridToFile, this);
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -36,19 +40,17 @@ void OmplPlanner::initializeState() {
     XmlRpc::XmlRpcValue startValues;
     ros::NodeHandle pNh("~");
 
-    if(pNh.hasParam("start_position")) {
+    if (pNh.hasParam("start_position")) {
         pNh.getParam("start_position", startValues);
         currentState_.position2DBase << startValues[0][0], startValues[0][1];
         currentState_.yaw_base = startValues[0][2];
         currentState_.jointAngles << startValues[1][0], startValues[1][1], startValues[1][2], startValues[1][3],
-                                     startValues[1][4], startValues[1][5];
-    }
-
-    else {
+                startValues[1][4], startValues[1][5];
+    } else {
         ROS_WARN("Param start position not found in vcxblox.yaml. Using default values");
-        currentState_.position2DBase << 0,0;
+        currentState_.position2DBase << 0, 0;
         currentState_.yaw_base = 0;
-        currentState_.jointAngles << 0, -PI/2, 0, 0, -PI/2, PI/4;
+        currentState_.jointAngles << 0, -PI / 2, 0, 0, -PI / 2, PI / 4;
     }
 
     //Setting up Transform for the base
@@ -65,7 +67,7 @@ void OmplPlanner::initializeState() {
     jointState_.name = {"SH_ROT", "SH_FLE", "EL_FLE", "EL_ROT", "WR_FLE", "WR_ROT"};
     jointState_.position.resize(6);
 
-    for(int i=0; i < jointState_.position.size(); i++)
+    for (int i = 0; i < jointState_.position.size(); i++)
         jointState_.position[i] = currentState_.jointAngles[i];
 
     //publishing base transform and joint states
@@ -74,8 +76,9 @@ void OmplPlanner::initializeState() {
 
     testLoop();
 }
+
 void OmplPlanner::testLoop() {
-    for(int i = 0; i < 100; i++) {
+    for (int i = 0; i < 100; i++) {
         jointState_.header.stamp = ros::Time::now();
         odomTrans_.header.stamp = ros::Time::now();
         pubArmState_.publish(jointState_);
@@ -92,8 +95,9 @@ void OmplPlanner::initializeKinematicInterfaceConfig() {
     {
         geometry_msgs::TransformStamped transformStamped;
         try {
-            transformStamped = tfBuffer.lookupTransform("base_link", kinematics.armMountLinkName(), ros::Time(0), ros::Duration(1.0));
-        } catch (tf2::TransformException& ex) {
+            transformStamped = tfBuffer.lookupTransform("base_link", kinematics.armMountLinkName(), ros::Time(0),
+                                                        ros::Duration(1.0));
+        } catch (tf2::TransformException &ex) {
             ROS_ERROR("%s", ex.what());
             throw;
         }
@@ -110,8 +114,9 @@ void OmplPlanner::initializeKinematicInterfaceConfig() {
     {
         geometry_msgs::TransformStamped transformStamped;
         try {
-            transformStamped = tfBuffer.lookupTransform(kinematics.toolMountLinkName(), "ENDEFFECTOR", ros::Time(0), ros::Duration(1.0));
-        } catch (tf2::TransformException& ex) {
+            transformStamped = tfBuffer.lookupTransform(kinematics.toolMountLinkName(), "ENDEFFECTOR", ros::Time(0),
+                                                        ros::Duration(1.0));
+        } catch (tf2::TransformException &ex) {
             ROS_ERROR("%s", ex.what());
             throw;
         }
@@ -135,7 +140,7 @@ void OmplPlanner::loadMap() {
     voxblox_msgs::FilePath srv;
     ros::NodeHandle pNh("~");
 
-    if(pNh.hasParam("path_world"))
+    if (pNh.hasParam("path_world"))
         pNh.getParam("path_world", srv.request.file_path);
     else {
         ROS_WARN("Could not read map from voxblox.yaml. Using default map");
@@ -221,7 +226,7 @@ void OmplPlanner::setUpVoxbloxCostConfig() {
     quaternion.transform.rotation = tf::createQuaternionMsgFromYaw(currentState_.yaw_base);
     sensor_msgs::JointState joints;
     joints.position.resize(6);
-    for(int i=0; i < joints.position.size(); i++)
+    for (int i = 0; i < joints.position.size(); i++)
         joints.position[i] = currentState_.jointAngles[i];
 
 //    visualizeCollisionPoints(quaternion, joints);
@@ -236,7 +241,7 @@ void OmplPlanner::cbPlanTrajectory(const mabi_msgs::PlanTrajectoryGoalConstPtr &
     currentState_.position2DBase.x() = goal->current_state.pose_base.x;
     currentState_.position2DBase.x() = goal->current_state.pose_base.x;
     currentState_.yaw_base = goal->current_state.pose_base.theta;
-    for(int i = 0; i < 6; i++)
+    for (int i = 0; i < 6; i++)
         currentState_.jointAngles[i] = goal->current_state.joint_state.position[i];
 
     // Setting goal:
@@ -244,7 +249,7 @@ void OmplPlanner::cbPlanTrajectory(const mabi_msgs::PlanTrajectoryGoalConstPtr &
     kindr_ros::convertFromRosGeometryMsg(goal->goal_pose.pose, goalPose);
 
     //Enabling writing to file
-    writeSolutionTrajectoryToFile_= true;
+    writeSolutionTrajectoryToFile_ = true;
     writeConditioningToFile_ = true;
     writeOccupancyGridToFile_ = true;
 
@@ -269,7 +274,7 @@ void OmplPlanner::cbDesiredEndEffectorPose(const geometry_msgs::PoseStampedConst
     planTrajectory(goalPose, "test");
 }
 
-ompl::base::GoalPtr OmplPlanner::convertPoseToOmplGoal(const kindr::HomTransformQuatD& goal_pose) {
+ompl::base::GoalPtr OmplPlanner::convertPoseToOmplGoal(const kindr::HomTransformQuatD &goal_pose) {
     auto space(std::make_shared<MabiStateSpace>());
     og::SimpleSetup ss(space);
 
@@ -297,16 +302,19 @@ int OmplPlanner::planTrajectory(const kindr::HomTransformQuatD &goal_pose, std::
     basePositionBounds.low.resize(2);
     Eigen::Vector2d::Map(basePositionBounds.low.data(), basePositionBounds.low.size()) = settings_.minBasePositionLimit;
     basePositionBounds.high.resize(2);
-    Eigen::Vector2d::Map(basePositionBounds.high.data(), basePositionBounds.high.size()) = settings_.maxBasePositionLimit;
+    Eigen::Vector2d::Map(basePositionBounds.high.data(),
+                         basePositionBounds.high.size()) = settings_.maxBasePositionLimit;
     space->basePoseStateSpace()->setBounds(basePositionBounds);
 
     // Bounds for the Arm
     RealVectorBounds armPositionBounds(Definitions::ARM_STATE_DIM_);
     armPositionBounds.low.resize(Definitions::ARM_STATE_DIM_);
-    Eigen::Matrix<double, Definitions::ARM_STATE_DIM_, 1>::Map(armPositionBounds.low.data(), armPositionBounds.low.size()) =
+    Eigen::Matrix<double, Definitions::ARM_STATE_DIM_, 1>::Map(armPositionBounds.low.data(),
+                                                               armPositionBounds.low.size()) =
             settings_.minArmPositionLimits;
     armPositionBounds.high.resize(Definitions::ARM_STATE_DIM_);
-    Eigen::Matrix<double, Definitions::ARM_STATE_DIM_, 1>::Map(armPositionBounds.high.data(), armPositionBounds.high.size()) =
+    Eigen::Matrix<double, Definitions::ARM_STATE_DIM_, 1>::Map(armPositionBounds.high.data(),
+                                                               armPositionBounds.high.size()) =
             settings_.maxArmPositionLimits;
     space->armStateSpace()->setBounds(armPositionBounds);
 
@@ -316,7 +324,8 @@ int OmplPlanner::planTrajectory(const kindr::HomTransformQuatD &goal_pose, std::
     //Setting up the collision detection
     auto si = ss.getSpaceInformation();
     esdfCachingServer_->updateInterpolator();
-    std::shared_ptr<VoxbloxStateValidityChecker> voxbloxStateValidityChecker = std::make_shared<VoxbloxStateValidityChecker>(si.get(), settings_.voxbloxCostConfig);
+    std::shared_ptr<VoxbloxStateValidityChecker> voxbloxStateValidityChecker = std::make_shared<VoxbloxStateValidityChecker>(
+            si.get(), settings_.voxbloxCostConfig);
     ss.setStateValidityChecker(voxbloxStateValidityChecker);
 
     // Defining the start
@@ -343,7 +352,8 @@ int OmplPlanner::planTrajectory(const kindr::HomTransformQuatD &goal_pose, std::
     ss.setPlanner(planner);
     ss.setup();
 
-    std::cout << "goal threshold (position, orientation: (" << settings_.positionTolerance << ", " << settings_.orientationTolerance << ")"
+    std::cout << "goal threshold (position, orientation: (" << settings_.positionTolerance << ", "
+              << settings_.orientationTolerance << ")"
               << std::endl;
 
     ob::PlannerStatus solved = ss.solve(settings_.maxPlanningTime);
@@ -352,17 +362,17 @@ int OmplPlanner::planTrajectory(const kindr::HomTransformQuatD &goal_pose, std::
         std::cout << "Solved:" << solved.asString() << std::endl;
 
         //Adding more points to solution trajectory
-        int n_points = int(ss.getSolutionPath().length() *10);
-        std::cout << "number of points to add"<< n_points <<std::endl;
+        int n_points = int(ss.getSolutionPath().length() * 10);
+        std::cout << "number of points to add" << n_points << std::endl;
         ss.getSolutionPath().interpolate(n_points);
 
         //Object to store solution in
         std::vector<CurrentState> solutionTrajectory;
         solutionTrajectory.resize(ss.getSolutionPath().getStateCount());
-        std::cout <<"state count is" << ss.getSolutionPath().getStateCount();
+        std::cout << "state count is" << ss.getSolutionPath().getStateCount();
 
         int i = 0;
-        for (const auto& state : ss.getSolutionPath().getStates()) {
+        for (const auto &state : ss.getSolutionPath().getStates()) {
             auto mabiSpace = state->as<MabiState>();
             CurrentState trajectoryPoint;
 
@@ -370,7 +380,7 @@ int OmplPlanner::planTrajectory(const kindr::HomTransformQuatD &goal_pose, std::
             trajectoryPoint.position2DBase.y() = mabiSpace->basePoseState()->getY();
             trajectoryPoint.yaw_base = mabiSpace->basePoseState()->getYaw();
 
-            for(int k = 0; k < 6; k++)
+            for (int k = 0; k < 6; k++)
                 trajectoryPoint.jointAngles[k] = mabiSpace->armState()->values[k];
 
             solutionTrajectory[i++] = trajectoryPoint;
@@ -379,25 +389,22 @@ int OmplPlanner::planTrajectory(const kindr::HomTransformQuatD &goal_pose, std::
         publishSolutionTrajectory(solutionTrajectory);
 
         Eigen::Vector2d center;
-        if(writeConditioningToFile_)
+        if (writeConditioningToFile_)
             center
-              = writeConditioningToFile(ss.getSolutionPath().getState(n_points - 1)->as<MabiState>(),
-                                        solutionTrajectory[0], name, true);
+                    = writeConditioningToFile(ss.getSolutionPath().getState(n_points - 1)->as<MabiState>(),
+                                              solutionTrajectory[0], name, true);
 
-        if(writeSolutionTrajectoryToFile_)
+        if (writeSolutionTrajectoryToFile_)
             writeTrajectoryToFile(solutionTrajectory, name, center);
 
-        if(writeOccupancyGridToFile_)
+        if (writeOccupancyGridToFile_)
             writeOccupancyGridToFile(0.2, name, center);
 
         ROS_INFO("Achieved Output");
         return OMPLSolution::SUCCESFULL;
-    }
-
-    else if(solved == ompl::base::PlannerStatus::StatusType::INVALID_START) {
+    } else if (solved == ompl::base::PlannerStatus::StatusType::INVALID_START) {
         return OMPLSolution::NO_VALID_START;
-    }
-    else {
+    } else {
         std::cout << "No solution found after" << settings_.maxPlanningTime << "s." << std::endl;
         return OMPLSolution::UNSUCCESFUL;
     }
@@ -407,8 +414,8 @@ int OmplPlanner::planTrajectory(const kindr::HomTransformQuatD &goal_pose, std::
 /// Publish Solution Trajectory to RVIZ
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void OmplPlanner::publishSolutionTrajectory(const std::vector<CurrentState>& solutionTrajectory) {
-    for(int i = 0; i < solutionTrajectory.size() && ros::ok(); i++) {
+void OmplPlanner::publishSolutionTrajectory(const std::vector<CurrentState> &solutionTrajectory) {
+    for (int i = 0; i < solutionTrajectory.size() && ros::ok(); i++) {
         //Setting up Transform for the base
         odomTrans_.header.stamp = ros::Time::now();
         odomTrans_.transform.translation.x = solutionTrajectory[i].position2DBase.x();
@@ -419,7 +426,7 @@ void OmplPlanner::publishSolutionTrajectory(const std::vector<CurrentState>& sol
         //Setting up the joint state
         jointState_.header.stamp = ros::Time::now();
 
-        for(int k=0; k < jointState_.position.size(); k++)
+        for (int k = 0; k < jointState_.position.size(); k++)
             jointState_.position[k] = solutionTrajectory[i].jointAngles[k];
 
         //publishing base transform and joint states
@@ -435,7 +442,7 @@ void OmplPlanner::publishSolutionTrajectory(const std::vector<CurrentState>& sol
 /// Write Data to file
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 void OmplPlanner::writeTrajectoryToFile(const std::vector<CurrentState> &trajectory, const std::string &name,
-                                        const Eigen::Vector2d& center) {
+                                        const Eigen::Vector2d &center) {
     ROS_INFO("Writing trajectory to file");
 
     std::ofstream trajectoryFile;
@@ -452,8 +459,8 @@ void OmplPlanner::writeTrajectoryToFile(const std::vector<CurrentState> &traject
     //Filling trajectory file
     for (int i = 1; i < n; i++) {
         trajectoryFile << trajectory[i].position2DBase.x() - center(0) << ","
-                        << trajectory[i].position2DBase.y() - center(1) << ","
-                        << trajectory[i].yaw_base;
+                       << trajectory[i].position2DBase.y() - center(1) << ","
+                       << trajectory[i].yaw_base;
         for (int k = 0; k < 6; k++)
             trajectoryFile << "," << trajectory[i].jointAngles[k];
 
@@ -464,7 +471,8 @@ void OmplPlanner::writeTrajectoryToFile(const std::vector<CurrentState> &traject
 }
 
 Eigen::Vector2d OmplPlanner::writeConditioningToFile(const MabiStateSpace::StateType *goalState,
-                                                     CurrentState startState, const std::string& name, bool center_trajectory) {
+                                                     CurrentState startState, const std::string name,
+                                                     bool center_trajectory) {
     // Obtaining position and orientation of the Endeffector in the Goal State
     Eigen::VectorXd goalMpcState;
     Eigen::Matrix<double, 4, 4> goalEndeffectorTransform;
@@ -473,17 +481,23 @@ Eigen::Vector2d OmplPlanner::writeConditioningToFile(const MabiStateSpace::State
 
     omplToMpcState(goalState, goalMpcState);
     kinematics.computeState2EndeffectorTransform(goalEndeffectorTransform, goalMpcState);
-    Eigen::Quaterniond goalEndeffectorRotation(goalEndeffectorTransform.block<3,3>(0, 0));
-    goalEndeffectorPosition = goalEndeffectorTransform.block<3,1>(0,3);
+    Eigen::Quaterniond goalEndeffectorRotation(goalEndeffectorTransform.block<3, 3>(0, 0));
+    goalEndeffectorPosition = goalEndeffectorTransform.block<3, 1>(0, 3);
 
     Eigen::Vector2d center;
-    if(center_trajectory) {
+    if (center_trajectory) {
         center << (startState.position2DBase.x() + goalEndeffectorPosition.x()) / 2,
-                  (startState.position2DBase.y() + goalEndeffectorPosition.y()) / 2;
-    }
-    else {
+                (startState.position2DBase.y() + goalEndeffectorPosition.y()) / 2;
+    } else {
         center << 0.0, 0.0;
     }
+
+    // Writing Center to file
+//    std::ofstream centerFile;
+//    centerFile.open(std::string("/home/nick/Data/Table/world_") + name[6] + std::string("_center.csv"));
+//    centerFile << std::endl;
+//    centerFile << name[6] << "_" << name[13] << "_" << name[21] << center(0) << "," << center(1);
+//    centerFile.close();
 
     //Opening file
     std::ofstream conditionFile;
@@ -491,8 +505,8 @@ Eigen::Vector2d OmplPlanner::writeConditioningToFile(const MabiStateSpace::State
 
     //Filling header
     conditionFile << "Start_x" << "," << "Start_y" << "," << "Start_yaw" << ","
-                  << "Start_q1" << "," << "Start_q2"  << "," << "Start_q3"  << ","
-                  << "Start_q4" << "," << "Start_q5"  << "," << "Start_q6"  << ","
+                  << "Start_q1" << "," << "Start_q2" << "," << "Start_q3" << ","
+                  << "Start_q4" << "," << "Start_q5" << "," << "Start_q6" << ","
                   << "Goal_x" << "," << "Goal_y" << "," << "Goal_z" << ","
                   << "Goal_q_w" << "," << "Goal_q_x" << "," << "Goal_q_y" << "," << "Goal_q_z" << std::endl;
     //Putting content in
@@ -513,48 +527,58 @@ Eigen::Vector2d OmplPlanner::writeConditioningToFile(const MabiStateSpace::State
 }
 
 void
-OmplPlanner::writeOccupancyGridToFile(const float resolution, const std::string &name, const Eigen::Vector2d& center) {
+OmplPlanner::writeOccupancyGridToFile(const float resolution, const std::string &name, const Eigen::Vector2d &center) {
     ROS_INFO("Writing Occupancy Grid");
     Eigen::Matrix<float, 3, 1> checkPoint;
     float distance;
     esdfCachingServer_->updateInterpolator();
     auto interpolator = esdfCachingServer_->getInterpolator();
 
-    const int n_x_points = int((settings_.maxBasePositionLimit(0) - settings_.minBasePositionLimit(0))/resolution) + 1;
-    const int n_y_points = int((settings_.maxBasePositionLimit(1) - settings_.minBasePositionLimit(1))/resolution) + 1;
-    const int n_z_points = int((settings_.minMaxHeight(1) - settings_.minMaxHeight(0))/resolution) + 1;
+    const int n_x_points =
+            int((settings_.maxBasePositionLimit(0) - settings_.minBasePositionLimit(0)) / resolution) + 1;
+    const int n_y_points =
+            int((settings_.maxBasePositionLimit(1) - settings_.minBasePositionLimit(1)) / resolution) + 1;
+    const int n_z_points = int((settings_.minMaxHeight(1) - settings_.minMaxHeight(0)) / resolution) + 1;
 
+    // Writing center to file
+    std::ofstream centerFile;
+    std::string file_center = std::string("/home/nick/Data/Table/world_") + name[6] + std::string("_center.csv");
+    centerFile.open(file_center, std::ios_base::app);
+    centerFile << std::endl;
+    centerFile << name << ","  << center(0) << "," << center(1);
+    centerFile.close();
 
     //Allocate Memory for 3D occupancy Grid
-    int*** occupancyGrid = new int**[n_z_points];
-    for (int i = 0; i < n_z_points; i++) {
-        occupancyGrid[i] = new int*[n_y_points];
-
-        for (int j = 0; j < n_y_points; j++)
-            occupancyGrid[i][j] = new int[n_x_points];
-    }
+//    int ***occupancyGrid = new int **[n_z_points];
+//    for (int i = 0; i < n_z_points; i++) {
+//        occupancyGrid[i] = new int *[n_y_points];
+//
+//        for (int j = 0; j < n_y_points; j++)
+//            occupancyGrid[i][j] = new int[n_x_points];
+//    }
 
     std::vector<Eigen::Matrix<float, 3, 1>> collisionPoints;
     std::ofstream occupancyGridFile;
     occupancyGridFile.open("/home/nick/Data/Table/" + name + "_occupancy_grid.csv");
 
     //Start to fill occupancy Grid
-    for(int i_z = 0; i_z < n_z_points; i_z++) {
-        for(int i_y = 0; i_y < n_y_points; i_y++) {
-            for(int i_x = 0; i_x < n_x_points; i_x++) {
-                checkPoint = {float(settings_.minBasePositionLimit[0] + i_x * resolution + center(0)) ,
+    for (int i_z = 0; i_z < n_z_points; i_z++) {
+        for (int i_y = 0; i_y < n_y_points; i_y++) {
+            for (int i_x = 0; i_x < n_x_points; i_x++) {
+                checkPoint = {float(settings_.minBasePositionLimit[0] + i_x * resolution + center(0)),
                               float(settings_.minBasePositionLimit[1] + i_y * resolution + center(1)),
                               float(settings_.minMaxHeight[0] + i_z * resolution)};
                 interpolator->getInterpolatedDistance(checkPoint, &distance);
 
-                if(distance <= resolution / 2) {
-                    occupancyGrid[i_z][i_y][i_x] = 1;
+                if (distance <= resolution / 2
+                    && checkPoint.x() < 5.1 && checkPoint.x() > -5.1        //Voxblox is weird outside map [-5,5]
+                    && checkPoint.y() < 5.1 && checkPoint.y() > -5.1) {
+//                    occupancyGrid[i_z][i_y][i_x] = 1;
                     occupancyGridFile << 1 << ",";
-                    if(VISUALIZE_COLLISION_POINTS)
+                    if (VISUALIZE_COLLISION_POINTS)
                         collisionPoints.insert(collisionPoints.end(), checkPoint);
-                }
-                else {
-                    occupancyGrid[i_z][i_y][i_x] = 0;
+                } else {
+//                    occupancyGrid[i_z][i_y][i_x] = 0;
                     occupancyGridFile << 0 << ",";
                 }
             }
@@ -565,7 +589,7 @@ OmplPlanner::writeOccupancyGridToFile(const float resolution, const std::string 
 
     ROS_INFO("Finished Occupancy Grid");
     occupancyGridFile.close();
-    if(VISUALIZE_COLLISION_POINTS)
+    if (VISUALIZE_COLLISION_POINTS)
         visualizeOccupancyGrid(collisionPoints);
 }
 
@@ -573,18 +597,20 @@ OmplPlanner::writeOccupancyGridToFile(const float resolution, const std::string 
 /// Visualization in RVIZ
 ////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
-void OmplPlanner::visualizeCollisionPoints(const geometry_msgs::TransformStamped& base, sensor_msgs::JointState joints) {
+void
+OmplPlanner::visualizeCollisionPoints(const geometry_msgs::TransformStamped &base, sensor_msgs::JointState joints) {
     Eigen::Matrix<double, 4, 1> quat(base.transform.rotation.w, base.transform.rotation.x,
                                      base.transform.rotation.y, base.transform.rotation.z);
-    Eigen::Matrix<double, 3,1> positionBase(base.transform.translation.x, base.transform.translation.y, base.transform.translation.z);
-    Eigen::Matrix<double, 6,1> jointsMatrix;
-    for(int i = 0; i < joints.position.size(); i++)
+    Eigen::Matrix<double, 3, 1> positionBase(base.transform.translation.x, base.transform.translation.y,
+                                             base.transform.translation.z);
+    Eigen::Matrix<double, 6, 1> jointsMatrix;
+    for (int i = 0; i < joints.position.size(); i++)
         jointsMatrix[i] = joints.position[i];
 
-    Eigen::Matrix<double, 13,1> state;
-    state.block<3,1>(0,0) = positionBase;
-    state.block<4,1>(3,0) = quat;
-    state.block<6,1>(7,0) = jointsMatrix;
+    Eigen::Matrix<double, 13, 1> state;
+    state.block<3, 1>(0, 0) = positionBase;
+    state.block<4, 1>(3, 0) = quat;
+    state.block<6, 1>(7, 0) = jointsMatrix;
 
     pubPointsOnRobot_.publish(pointsOnRobot_->getVisualization(state));
 }
@@ -595,7 +621,7 @@ void OmplPlanner::visualizeOccupancyGrid(const std::vector<Eigen::Matrix<float, 
     markerArray.markers.resize(n);
 
     for (int i = 0; i < n; i++) {
-        auto& marker = markerArray.markers[i];
+        auto &marker = markerArray.markers[i];
         marker.type = visualization_msgs::Marker::Type::SPHERE;
         marker.id = i;
         marker.action = 0;

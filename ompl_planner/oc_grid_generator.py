@@ -6,20 +6,20 @@ import numpy as np
 from pathlib import Path
 from mabi_msgs.srv import LoadMapRequest, LoadMap, WriteCenteredOcGrid, WriteCenteredOcGridRequest
 
-files_start_goal = []
 
-
-def set_up_file_list(n_goals, n_starts, worlds_array=[0]):
-    for world in worlds_array:
+def set_up_file_list(n_goals, n_starts, worlds=[]):
+    files_start_goal = []
+    for world in worlds:
         for goal in range(n_goals):
             for start in range(n_starts):
                 file_trajectory = Path(
-                    "/home/nick/Data/Table/world_" + str(world) + "_goal_" + str(goal) + "_start_" + str(start)
-                    + "_condition.txt")
+                    "/home/nick/Data/Table/world_" + str(world) + "/world_" + str(world) + "_goal_" + str(goal) +
+                    "_start_" + str(start) + "_condition.txt")
 
                 # If Data file exists, add to path
                 if file_trajectory.is_file():
                     files_start_goal.append([file_trajectory.absolute(), world, goal, start])
+    return files_start_goal
 
 
 def load_new_map(name):
@@ -40,7 +40,8 @@ def load_new_map(name):
         return False
 
 
-def rewrite_oc_grids():
+def rewrite_oc_grids(n_goals, n_starts, worlds=[]):
+    files_start_goal = set_up_file_list(n_goals, n_starts, worlds)
     rospy.wait_for_service("write_oc_grid_to_file")
     print("service write_oc_grid_to_file found")
     srv_client_oc_grid = rospy.ServiceProxy("write_oc_grid_to_file", WriteCenteredOcGrid)
@@ -54,7 +55,7 @@ def rewrite_oc_grids():
             old_world = world
             if load_new_map("/home/nick/mpc_ws/src/perceptive_mpc/maps/esdfs/world_" + str(world) + ".esdf"):
                 print("Going 40s to sleep while loading map")
-                rospy.sleep(40)
+                rospy.sleep(20)
                 print("Woke up from sleep")
             else:
                 print("Error, Map can't be loaded!", " world_", str(world), "_goal_", str(goal), "_start_", str(start))
@@ -82,11 +83,59 @@ def find_center(name):
     return [center[0], center[1]]
 
 
+########################################################################################################################
+## Rewrite OC_GRID from center file
+########################################################################################################################
+
+def find_centers_from_file(world):
+    path = "/home/nick/Data/Table/world_" + str(world) + "/world_" + str(world) + "_center.csv"
+    # path = "home/nick/Data/Table/world_0/world_0_center.csv"
+    df = pd.read_csv(path, header=None)
+    oc_grid_list = []
+    for row in df.iterrows():
+        # print("hi")
+        oc_grid_list.append([row[1][0], row[1][1], row[1][2]])
+    return oc_grid_list
+
+
+def rewrite_centered_grid_from_list(world):
+    rospy.wait_for_service("write_oc_grid_to_file")
+    print("service write_oc_grid_to_file found")
+    srv_client_oc_grid = rospy.ServiceProxy("write_oc_grid_to_file", WriteCenteredOcGrid)
+    req = WriteCenteredOcGridRequest()
+
+    oc_grid_list = find_centers_from_file(world)
+    if load_new_map("/home/nick/mpc_ws/src/perceptive_mpc/maps/esdfs/world_" + str(world) + ".esdf"):
+        print("Going 40s to sleep while loading map")
+        rospy.sleep(20)
+        print("Woke up from sleep")
+    else:
+        print("Error, Map can't be loaded!", " world_", str(world))
+        return -1
+
+    for row in oc_grid_list:
+        print("________________________")
+        print(row[0])
+        print("________________________")
+
+        req.name = row[0]
+        req.resolution = 0.2
+        req.center = [row[1], row[2]]
+        # print(req.center)
+        try:
+            response = srv_client_oc_grid(req)
+
+        except rospy.ServiceException as e:
+            print("Service call failed: %s" % e)
+            return -1
+
+
 if __name__ == '__main__':
-    rospy.init_node('target_pose_publisher', anonymous=True)
-    set_up_file_list(n_goals=70, n_starts=11, worlds_array=[3])
-    # set_up_file_list(n_goals=1, n_starts=5, worlds_array=[0, 1, 2, 3])
-    # set_up_file_list(n_goals=1, n_starts=5, worlds_array=[3])
-    rewrite_oc_grids()
+    # rospy.init_node('target_pose_publisher', anonymous=True)
+
+
+    # rewrite_oc_grids(n_goals=70, n_starts=11, worlds=[3])
+    rewrite_centered_grid_from_list(world=5)
+
     print("Finished writing data")
-    rospy.spin()
+    # rospy.spin()

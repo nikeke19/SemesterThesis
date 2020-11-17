@@ -149,7 +149,7 @@ private:
     void writeTrajectoryToFile(const std::vector<CurrentState> &trajectory, const std::string &name,
                                const Eigen::Vector2d& center);
     Eigen::Vector2d writeConditioningToFile(const MabiStateSpace::StateType *goalState, CurrentState startState,
-                                            const std::string& name, bool center_trajectory=false);
+                                            const std::string name, bool center_trajectory=false);
     void writeOccupancyGridToFile(const float resolution, const std::string &name, const Eigen::Vector2d& center);
 
     //Visualization

@@ -98,7 +98,7 @@ void WriteOcGrid::writeOccupancyGridToFile(const float resolution, std::string n
 
                 if (distance <= resolution / 2
                     && checkPoint.x() < 5.1 && checkPoint.x() > -4.1        //Voxblox is weird outside map [-5,5]
-                    && checkPoint.y() < 5.1 && checkPoint.y() > -3.7) {
+                    && checkPoint.y() < 5.1 && checkPoint.y() > -5.1) {
 //                    occupancyGrid[i_z][i_y][i_x] = 1;
                     occupancyGridFile << 1 << ",";
                 } else {

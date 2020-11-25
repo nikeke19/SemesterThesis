@@ -542,7 +542,8 @@ OmplPlanner::writeOccupancyGridToFile(const float resolution, const std::string 
 
     // Writing center to file
     std::ofstream centerFile;
-    std::string file_center = std::string("/home/nick/Data/Table/world_") + name[6] + std::string("_center.csv");
+    std::string file_center = std::string("/home/nick/Data/Table/world_") + name[6] + name[7] +
+            std::string("_center.csv"); // todo change back to name[6] only!
     centerFile.open(file_center, std::ios_base::app);
     centerFile << std::endl;
     centerFile << name << ","  << center(0) << "," << center(1);
@@ -559,7 +560,7 @@ OmplPlanner::writeOccupancyGridToFile(const float resolution, const std::string 
 
     std::vector<Eigen::Matrix<float, 3, 1>> collisionPoints;
     std::ofstream occupancyGridFile;
-    occupancyGridFile.open("/home/nick/Data/Table/" + name + "_occupancy_grid.csv");
+    occupancyGridFile.open("/home/nick/Data/Table/" + name + "_occupancy_grid.txt");
 
     //Start to fill occupancy Grid
     for (int i_z = 0; i_z < n_z_points; i_z++) {
@@ -567,7 +568,7 @@ OmplPlanner::writeOccupancyGridToFile(const float resolution, const std::string 
             for (int i_x = 0; i_x < n_x_points; i_x++) {
                 checkPoint = {float(settings_.minBasePositionLimit[0] + i_x * resolution + center(0)),
                               float(settings_.minBasePositionLimit[1] + i_y * resolution + center(1)),
-                              float(settings_.minMaxHeight[0] + i_z * resolution)};
+                              float(0.05 + i_z * resolution)};
                 interpolator->getInterpolatedDistance(checkPoint, &distance);
 
                 if (distance <= resolution / 2

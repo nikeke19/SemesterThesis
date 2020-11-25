@@ -15,21 +15,22 @@ int main(int argc, char** argv)
     ROS_INFO("Started train data generator");
     ros::NodeHandle nh;
     ros::NodeHandle pNh("~");
-    XmlRpc::XmlRpcValue trajectories;
+    XmlRpc::XmlRpcValue goalPoints;
     std::string world;
     pNh.getParam("world", world);
+    ROS_INFO_STREAM("world is " << world);
 
     // Check if everything is in the right format
     if (pNh.hasParam("goal_points")) {
-        pNh.getParam("goal_points", trajectories);
-        if(trajectories.size()==0) {
+        pNh.getParam("goal_points", goalPoints);
+        if(goalPoints.size() == 0) {
             ROS_ERROR("No goal points in data_gen.yaml");
             return 0;
         }
         else {
-            for(int i = 0; i < trajectories.size(); i++) {
-                if(trajectories[i].size() != 3) {
-                    ROS_ERROR_STREAM("Wrong amount of coordinates. 3 were expected and given are" << trajectories[i].size());
+            for(int i = 0; i < goalPoints.size(); i++) {
+                if(goalPoints[i].size() != 3) {
+                    ROS_ERROR_STREAM("Wrong amount of coordinates. 3 were expected and given are" << goalPoints[i].size());
                     ROS_ERROR_STREAM("Check " << i <<"th line of your data_gen.yaml file");
                     return 0;
                 }
@@ -80,12 +81,12 @@ int main(int argc, char** argv)
     std::uniform_real_distribution<double> distribution_y(-5.0, 5.0);
     std::uniform_real_distribution<double> distribution_yaw(-PI, PI);
 
-    int n_trajectories = trajectories.size();
+    int n_trajectories = goalPoints.size();
     for(int i = 0; i < n_trajectories; i++) { //todo was zero but changed to 13
         //Setting goal
-        goal.goal_pose.pose.position.x = trajectories[i][0];
-        goal.goal_pose.pose.position.y = trajectories[i][1];
-        goal.goal_pose.pose.position.z = trajectories[i][2];
+        goal.goal_pose.pose.position.x = goalPoints[i][0];
+        goal.goal_pose.pose.position.y = goalPoints[i][1];
+        goal.goal_pose.pose.position.z = goalPoints[i][2];
 
         // Setting n_random_starts positions and planning to goal i
         for(int k = 0, count = 0; k < n_random_start_configurations && count < n_random_start_configurations * 2; count ++) {

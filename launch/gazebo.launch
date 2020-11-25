@@ -4,7 +4,7 @@
         <arg name="debug" default="false" />
         <arg name="gui" default="true" />
         <arg name="pause" default="true" />
-        <arg name="world" default="$(find perceptive_mpc)/maps/worlds/world_2.world" />
+        <arg name="world" default="$(find perceptive_mpc)/maps/worlds/world_1.world" />
         <!--arg name="world" default="$(find perceptive_mpc)/maps/kitchen.world" /-->
 
         <!-- include gazebo_ros launcher -->

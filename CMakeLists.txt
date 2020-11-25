@@ -24,6 +24,8 @@ find_package(catkin REQUIRED COMPONENTS
     message_generation
 )
 
+#find_package(Torch REQUIRED)
+
 find_package(Boost REQUIRED COMPONENTS
   system
   filesystem

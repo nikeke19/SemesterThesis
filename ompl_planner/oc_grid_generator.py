@@ -134,8 +134,8 @@ if __name__ == '__main__':
     # rospy.init_node('target_pose_publisher', anonymous=True)
 
 
-    # rewrite_oc_grids(n_goals=70, n_starts=11, worlds=[3])
-    rewrite_centered_grid_from_list(world=5)
+    rewrite_oc_grids(n_goals=70, n_starts=11, worlds=[3])
+    # rewrite_centered_grid_from_list(world=5)
 
     print("Finished writing data")
     # rospy.spin()

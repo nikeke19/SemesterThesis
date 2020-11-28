@@ -66,7 +66,7 @@ int main(int argc, char** argv)
     goal.goal_pose.pose.orientation.x = 0.7;
     goal.goal_pose.pose.orientation.y = 0.0;
     goal.goal_pose.pose.orientation.z = 0.0;
-    int n_random_start_configurations = 10;
+    int n_random_start_configurations = 20;
 
     std::default_random_engine generator;
     std::normal_distribution<double> distribution_q1(0, PI/3);
@@ -125,26 +125,6 @@ int main(int argc, char** argv)
 
     }
 
-//    //Setting goal
-//    goal.goal_pose.pose.position.x = 0.94;
-//    goal.goal_pose.pose.position.y = -0.45;
-//    goal.goal_pose.pose.position.z = 0.84;
-//    goal.goal_pose.pose.orientation.w = -0.7;
-//    goal.goal_pose.pose.orientation.x = 0.7;
-//    goal.goal_pose.pose.orientation.y = 0.0;
-//    goal.goal_pose.pose.orientation.z = 0.0;
-//
-//    goal.file_name = "test_from_external";
-//
-//    for(int i = 0; i < 6; i++)
-//        goal.current_state.joint_state.position[i] = 0;
-//
-//    goal.current_state.pose_base.x = -1;
-//    goal.current_state.pose_base.y = 0;
-//    goal.current_state.pose_base.theta = 0.4;
-//
-//    //Executing Plan
-//    ac.sendGoal(goal);
     ROS_INFO("Finished data writting");
 
 }

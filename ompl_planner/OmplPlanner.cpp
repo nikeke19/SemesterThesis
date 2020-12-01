@@ -239,7 +239,7 @@ void OmplPlanner::setUpVoxbloxCostConfig() {
 void OmplPlanner::cbPlanTrajectory(const mabi_msgs::PlanTrajectoryGoalConstPtr &goal) {
     // Setting new current state
     currentState_.position2DBase.x() = goal->current_state.pose_base.x;
-    currentState_.position2DBase.x() = goal->current_state.pose_base.x;
+    currentState_.position2DBase.y() = goal->current_state.pose_base.y;
     currentState_.yaw_base = goal->current_state.pose_base.theta;
     for (int i = 0; i < 6; i++)
         currentState_.jointAngles[i] = goal->current_state.joint_state.position[i];
@@ -398,7 +398,7 @@ int OmplPlanner::planTrajectory(const kindr::HomTransformQuatD &goal_pose, std::
             writeTrajectoryToFile(solutionTrajectory, name, center);
 
         if (writeOccupancyGridToFile_)
-            writeOccupancyGridToFile(0.2, name, center);
+            writeOccupancyGridToFile(0.1, name, center);
 
         ROS_INFO("Achieved Output");
         return OMPLSolution::SUCCESFULL;
@@ -434,7 +434,7 @@ void OmplPlanner::publishSolutionTrajectory(const std::vector<CurrentState> &sol
         tfOdomBroadcaster_.sendTransform(odomTrans_);
         //visualizeCollisionPoints(odomTrans_, jointState_);
         ros::spinOnce();
-        ros::Rate(25).sleep();
+        ros::Rate(75).sleep();
     }
 }
 
@@ -492,13 +492,6 @@ Eigen::Vector2d OmplPlanner::writeConditioningToFile(const MabiStateSpace::State
         center << 0.0, 0.0;
     }
 
-    // Writing Center to file
-//    std::ofstream centerFile;
-//    centerFile.open(std::string("/home/nick/Data/Table/world_") + name[6] + std::string("_center.csv"));
-//    centerFile << std::endl;
-//    centerFile << name[6] << "_" << name[13] << "_" << name[21] << center(0) << "," << center(1);
-//    centerFile.close();
-
     //Opening file
     std::ofstream conditionFile;
     conditionFile.open("/home/nick/Data/Table/" + name + "_condition.csv");
@@ -549,37 +542,29 @@ OmplPlanner::writeOccupancyGridToFile(const float resolution, const std::string 
     centerFile << name << ","  << center(0) << "," << center(1);
     centerFile.close();
 
-    //Allocate Memory for 3D occupancy Grid
-//    int ***occupancyGrid = new int **[n_z_points];
-//    for (int i = 0; i < n_z_points; i++) {
-//        occupancyGrid[i] = new int *[n_y_points];
-//
-//        for (int j = 0; j < n_y_points; j++)
-//            occupancyGrid[i][j] = new int[n_x_points];
-//    }
-
     std::vector<Eigen::Matrix<float, 3, 1>> collisionPoints;
     std::ofstream occupancyGridFile;
     occupancyGridFile.open("/home/nick/Data/Table/" + name + "_occupancy_grid.txt");
 
     //Start to fill occupancy Grid
-    for (int i_z = 0; i_z < n_z_points; i_z++) {
-        for (int i_y = 0; i_y < n_y_points; i_y++) {
-            for (int i_x = 0; i_x < n_x_points; i_x++) {
-                checkPoint = {float(settings_.minBasePositionLimit[0] + i_x * resolution + center(0)),
-                              float(settings_.minBasePositionLimit[1] + i_y * resolution + center(1)),
-                              float(0.05 + i_z * resolution)};
+    for (int i_z = 0; i_z < 21; i_z++) { // was i_z < n_z_points
+        for (int i_y = 0; i_y < 41; i_y++) { // was i_y < n_y_points
+            for (int i_x = 0; i_x < 41; i_x++) { // was i_x < n_x_points
+//                checkPoint = {float(settings_.minBasePositionLimit[0] + i_x * resolution + center(0)),
+//                              float(settings_.minBasePositionLimit[1] + i_y * resolution + center(1)),
+//                              float(0.05 + i_z * resolution)};
+                checkPoint = {float(-2.0 + i_x * 0.1 + center(0)),
+                              float(-2.0 + i_y * 0.1 + center(1)),
+                              float(0.05 + i_z * 0.1)};
                 interpolator->getInterpolatedDistance(checkPoint, &distance);
 
                 if (distance <= resolution / 2
                     && checkPoint.x() < 5.1 && checkPoint.x() > -5.1        //Voxblox is weird outside map [-5,5]
                     && checkPoint.y() < 5.1 && checkPoint.y() > -5.1) {
-//                    occupancyGrid[i_z][i_y][i_x] = 1;
                     occupancyGridFile << 1 << ",";
                     if (VISUALIZE_COLLISION_POINTS)
                         collisionPoints.insert(collisionPoints.end(), checkPoint);
                 } else {
-//                    occupancyGrid[i_z][i_y][i_x] = 0;
                     occupancyGridFile << 0 << ",";
                 }
             }
